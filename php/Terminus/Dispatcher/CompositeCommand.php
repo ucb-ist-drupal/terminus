@@ -2,6 +2,8 @@
 
 namespace Terminus\Dispatcher;
 
+use Terminus;
+
 /**
  * A non-leaf node in the command tree.
  */
@@ -57,7 +59,7 @@ class CompositeCommand {
   function get_usage( $prefix ) {
     return sprintf( "%s%s %s",
       $prefix,
-      implode( ' ', get_path( $this ) ),
+      implode( ' ', getPath( $this ) ),
       $this->get_synopsis()
     );
   }
@@ -70,11 +72,11 @@ class CompositeCommand {
     foreach ( $methods as $name => $subcommand ) {
       $prefix = ( 0 == $i++ ) ? 'usage: ' : '   or: ';
 
-      \Terminus::line( $subcommand->get_usage( $prefix ) );
+      Terminus::line( $subcommand->get_usage( $prefix ) );
     }
 
-    \Terminus::line();
-    \Terminus::line( "See 'terminus help $this->name <command>' for more information on a specific command." );
+    Terminus::line();
+    Terminus::line( "See 'terminus help $this->name <command>' for more information on a specific command." );
   }
 
   function invoke( $args, $assoc_args, $extra_args ) {

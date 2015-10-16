@@ -21,7 +21,7 @@ class PrettyFormatter implements OutputFormatterInterface {
    */
   public function formatValue($value, $human_label = '') {
     $value = PrettyFormatter::flattenValue($value);
-    return $human_label ? "$human_label: $value\n" : $value;
+    return $human_label ? "$human_label: $value" . PHP_EOL : $value;
   }
 
   /**
@@ -46,10 +46,10 @@ class PrettyFormatter implements OutputFormatterInterface {
     $record = (array)$record;
     foreach ((array)$record as $key => $value) {
       $label = self::getHumanLabel($key, $human_labels);
-      $rows[] = [$label, $value];
+      $rows[] = array($label, $value);
     }
 
-    return $this->formatTable($rows, ['Key', 'Value']);
+    return $this->formatTable($rows, array('Key', 'Value'));
   }
 
   /**
@@ -98,7 +98,7 @@ class PrettyFormatter implements OutputFormatterInterface {
       $new = array();
       $record = (array)$record;
       foreach ($keys as $key) {
-        $new[$key] = isset($record[$key]) ? PrettyFormatter::flattenValue($record[$key]) : '';
+        $new[$key] = isset($record[$key]) ? PrettyFormatter::flattenValue($record[$key], $human_labels) : '';
       }
       $records[$i] = $new;
     }
@@ -164,10 +164,19 @@ class PrettyFormatter implements OutputFormatterInterface {
    * @param mixed $value
    * @return string
    */
-  private static function flattenValue($value) {
-    if (is_array($value) || is_object($value)) {
-      $value = join(', ', (array)$value);
+  private static function flattenValue($value, $human_labels = array()) {
+    if (is_scalar($value)) {
+      return $value;
     }
+
+    // Merge an array or object down. Doesn't look great past 2 levels of depth.
+    $is_assoc = is_array($value) && (bool)count(array_filter(array_keys($value), 'is_string'));
+    if ($is_assoc || is_object($value)) {
+      foreach ($value as $key => $val) {
+        $value[$key] = PrettyFormatter::getHumanLabel($key, $human_labels) . ': ' . PrettyFormatter::flattenValue($val, $human_labels);
+      }
+    }
+    $value = join(', ', (array)$value);
     return $value;
   }
 

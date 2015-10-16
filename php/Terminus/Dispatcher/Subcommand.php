@@ -2,6 +2,9 @@
 
 namespace Terminus\Dispatcher;
 
+use Terminus;
+use Terminus\Exceptions\TerminusException;
+
 /**
  * A leaf node in the command tree.
  */
@@ -42,13 +45,13 @@ class Subcommand extends CompositeCommand {
   }
 
   function show_usage( $prefix = 'usage: ' ) {
-    \Terminus::line( $this->get_usage( $prefix ) );
+    Terminus::line( $this->get_usage( $prefix ) );
   }
 
   function get_usage( $prefix ) {
     return sprintf( "%s%s %s",
       $prefix,
-      implode( ' ', get_path( $this ) ),
+      implode( ' ', getPath( $this ) ),
       $this->get_synopsis()
     );
   }
@@ -58,7 +61,7 @@ class Subcommand extends CompositeCommand {
     try {
       $response = \cli\prompt( $question, $default );
     } catch( \Exception $e ) {
-      \Terminus::line();
+      Terminus::line();
       return false;
     }
 
@@ -72,7 +75,7 @@ class Subcommand extends CompositeCommand {
     if ( ! $synopsis )
       return array( $args, $assoc_args );
 
-    $spec = array_filter( \Terminus\SynopsisParser::parse( $synopsis ), function( $spec_arg ) {
+    $spec = array_filter(Terminus\SynopsisParser::parse( $synopsis ), function( $spec_arg ) {
       return in_array( $spec_arg['type'], array( 'generic', 'positional', 'assoc', 'flag' ) );
     });
 
@@ -162,14 +165,14 @@ class Subcommand extends CompositeCommand {
     if ( !$synopsis )
       return array();
 
-    $validator = new \Terminus\SynopsisValidator( $synopsis );
+    $validator = new Terminus\SynopsisValidator( $synopsis );
 
-    $cmd_path = implode( ' ', get_path( $this ) );
+    $cmd_path = implode( ' ', getPath( $this ) );
     foreach ( $validator->get_unknown() as $token ) {
-      \Terminus::warning( sprintf(
-        "The `%s` command has an invalid synopsis part: %s",
-        $cmd_path, $token
-      ) );
+      Terminus::getLogger()->warning(
+        'The `{cmd}` command has an invalid synopsis part: {token}',
+        array('cmd' => $cmd_path, 'token' => $token)
+      );
     }
 
     if ( !$validator->enough_positionals( $args ) ) {
@@ -180,18 +183,18 @@ class Subcommand extends CompositeCommand {
     if ( $this->name != 'help') {
       $invalid = $validator->invalid_positionals($args);
       if($invalid) {
-        \Terminus::error("Invalid positional value: $invalid");
+        throw new TerminusException("Invalid positional value: {invalid}", array('invalid' => $invalid));
       }
     }
 
     $unknown_positionals = $validator->unknown_positionals($args);
     if ( !empty( $unknown_positionals ) ) {
-      \Terminus::error( 'Too many positional arguments: ' .
-        implode( ' ', $unknown_positionals ) );
+      throw new TerminusException('Too many positional arguments: {args}',
+        array('args' => implode( ' ', $unknown_positionals )));
     }
 
     list( $errors, $to_unset ) = $validator->validate_assoc(
-      array_merge( \Terminus::get_config(), $extra_args, $assoc_args )
+      array_merge( Terminus::getConfig(), $extra_args, $assoc_args )
     );
 
     foreach ( $validator->unknown_assoc( $assoc_args ) as $key ) {
@@ -204,16 +207,18 @@ class Subcommand extends CompositeCommand {
         $out .= "\n " . $error;
       }
 
-      \Terminus::error( $out );
+      throw new TerminusException($out);
     }
 
-    array_map( '\\Terminus::warning', $errors['warning'] );
+    foreach ($errors['warning'] as $warning) {
+      Terminus::getLogger()->warning($warning);
+    }
 
     return $to_unset;
   }
 
   function invoke( $args, $assoc_args, $extra_args ) {
-    if ( \Terminus::get_config( 'interactive' ) )
+    if ( Terminus::getConfig( 'interactive' ) )
       list( $args, $assoc_args ) = $this->prompt_args( $args, $assoc_args );
 
     $to_unset = $this->validate_args( $args, $assoc_args, $extra_args );
@@ -222,7 +227,7 @@ class Subcommand extends CompositeCommand {
       unset( $assoc_args[ $key ] );
     }
 
-    $path = get_path( $this->get_parent() );
+    $path = getPath( $this->get_parent() );
 
     call_user_func( $this->when_invoked, $args, array_merge( $extra_args, $assoc_args ) );
   }

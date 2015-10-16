@@ -1,10 +1,9 @@
 <?php
 
-use Terminus\Dispatcher;
-use Terminus\Utils;
 use Terminus\CommandWithSSH;
-use Terminus\Models\Collections\Sites;
+use Terminus\Exceptions\TerminusException;
 use Terminus\Helpers\Input;
+use Terminus\Models\Collections\Sites;
 
 class WPCLI_Command extends CommandWithSSH {
 
@@ -29,8 +28,7 @@ class WPCLI_Command extends CommandWithSSH {
     $sites = new Sites();
     $site = $sites->get(Input::sitename($assoc_args));
     if (!$site) {
-      Terminus::error("Command could not be completed. Unknown site specified.");
-      exit;
+      throw new TerminusException("Command could not be completed. Unknown site specified.");
     }
 
     # see https://github.com/pantheon-systems/titan-mt/blob/master/dashboardng/app/workshops/site/models/environment.coffee
@@ -62,11 +60,21 @@ class WPCLI_Command extends CommandWithSSH {
         $flags .= "--$k ";
       }
     }
-    $this->logger->info(vsprintf("Running wp %s %s on %s-%s", array($command,$flags,$site->get('name'),$environment)));
-    $this->send_command($server, 'wp', $args, $assoc_args );
-
+    $this->log()->info(
+      "Running wp {cmd} {flags} on {site}-{env}",
+      array(
+        'cmd' => $command,
+        'flags' => $flags,
+        'site' => $site->get('name'),
+        'env' => $environment
+      )
+    );
+    $result = $this->send_command($server, 'wp', $args, $assoc_args);
+    if (Terminus::getConfig('format') != 'normal') {
+      $this->output()->outputRecordList($result);
+    }
   }
 
 }
 
-Terminus::add_command( 'wp', 'WPCLI_Command' );
+Terminus::addCommand( 'wp', 'WPCLI_Command' );

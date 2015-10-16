@@ -31,7 +31,7 @@ class Upstreams_Command extends TerminusCommand {
       'id',
       array('id', 'longname', 'category', 'type', 'framework')
     );
-    $this->outputter->outputRecordList(
+    $this->output()->outputRecordList(
       $upstreams_list,
       array('id' => 'ID', 'longname' => 'Name', 'category' => 'Category', 'type' => 'Type', 'framework' => 'Framework')
     );
@@ -40,4 +40,4 @@ class Upstreams_Command extends TerminusCommand {
 
 }
 
-Terminus::add_command('upstreams', 'Upstreams_Command');
+Terminus::addCommand('upstreams', 'Upstreams_Command');

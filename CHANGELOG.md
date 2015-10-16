@@ -1,8 +1,28 @@
 #Change Log
 All notable changes to this project starting with the 0.6.0 release will be documented in this file. This project adheres to [Semantic Versioning](http://semver.org)
 
-##MASTER
+##Master
+### Added
+- `site environment-info --site=<site> --env=<env> [--field=<field>]` (#582)
+
+### Fixed
+- `site connection-info` Git, MySQL and Redis info now correct (#573)
+- Password no longer shows when logging in with some Windows terminal clients (#574)
+- No more errors when running Terminus in Windows from directories with spaces in the path. (#575)
+
 ### Changed
+- Logged errors now exit with -1. (#576)
+- `--bash`, `--json`, and `--silent` have been replaced with `--format=<bash|json|silent` (#577)
+- `site connection-mode` no longer checks the connection mode. Connection-mode checks are now done using `site environment-info --field=connection_mode` (#583)
+- `site connection-mode` is now `site set-connection-mode` and uses the `--mode` flag instead of `--set`. (#583)
+- `site import` is now `site import-content` and the --element parameter only accepts "files" and "database" (#516)
+
+### Removed
+- Removed `site attributes`. Use `site info` for the same effect. (#584)
+
+##[0.8.1] - 2015-09-28
+### Changed
+- Packagist now indexes this project as `[pantheon-systems/cli](https://packagist.org/packages/pantheon-systems/cli)` (was `terminus/terminus`)
 - `site owner` now just returns the owner ID. The --set flag has been removed. Setting is now done by `site set-owner`. (#469)
 - `site backup get` flag `--to-directory` is now `--to` and accepts either a directory or a file name (#493)
 - `site clear-caches` is now `site clear-cache` (#353)
@@ -16,9 +36,15 @@ All notable changes to this project starting with the 0.6.0 release will be docu
 
 ###Added
 - `site set owner --site=<site> --set=<owner>` sets the site owner to the given user ID. (#499)
+- `site tags list --site=<site> --org=<org>` will list tags associated between that organizaiton and site (#517)
+- Terminus now checks for software updates once per week and will log to info if one is available. (#512)
 
 ###Fixed
 - `site organizations add|remove` no longer crashes when given an invalid organization. (#515)
+- Filename for aliases as shown in `sites aliases` help text (#522)
+- Element selection on `sites backups` (#532)
+- Fixed regression on backups (#525)
+- Fixed PHP 5.3.x compatibility (#541)
 
 ##[0.8.0] - 2015-09-15
 ###Added

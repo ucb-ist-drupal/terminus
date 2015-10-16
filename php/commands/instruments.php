@@ -23,9 +23,9 @@ class Instruments_Command extends TerminusCommand {
        );
      }
 
-    $this->outputter->outputRecordList($data);
+    $this->output()->outputRecordList($data);
   }
 
 }
 
-Terminus::add_command('instruments', 'Instruments_Command');
+Terminus::addCommand('instruments', 'Instruments_Command');

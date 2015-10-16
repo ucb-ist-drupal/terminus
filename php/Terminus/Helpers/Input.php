@@ -2,9 +2,11 @@
 
 namespace Terminus\Helpers;
 
-use \Terminus\Models\User;
+use Terminus;
+use Terminus\Exceptions\TerminusException;
+use Terminus\Models\User;
 use Terminus\Models\Collections\Sites;
-use \Terminus\Models\Collections\Upstreams;
+use Terminus\Models\Collections\Upstreams;
 
 /**
  * Helper class to handle inputs
@@ -58,7 +60,10 @@ class Input {
       $text = "Select one",
       $return_value = false
   ) {
-    echo PHP_EOL;
+    if (count($choices) == 1) {
+      $only_choice = array_shift($choices);
+      return $only_choice;
+    }
     $index = \cli\Streams::menu($choices, $default, $text);
     if ($return_value) {
       return $choices[$index];
@@ -95,16 +100,12 @@ class Input {
     $default = null,
     $options = array()
   ) {
-    $allow_none = true;
-    if (isset($options['allow_none'])) {
-      $allow_none = $options['allow_none'];
-    }
     $arguments = $args;
     if (!isset($arguments[$key]) && isset($_SERVER['TERMINUS_ORG'])) {
       $arguments[$key] = $_SERVER['TERMINUS_ORG'];
     }
 
-    $orglist = Input::orglist();
+    $orglist = Input::orglist($options);
     $flip    = array_flip($orglist);
     if (isset($arguments[$key])) {
       if (isset($flip[$arguments[$key]])) {
@@ -119,7 +120,6 @@ class Input {
       }
     }
 
-    $orglist = Input::orglist(array('allow_none' => $allow_none));
     // include the Org ID in the output menu
     $orglist_with_id = array();
     foreach ($orglist as $id => $name) {
@@ -130,7 +130,7 @@ class Input {
       $orglist_with_id[$id] = sprintf("%s (%s)", $name, $id);
     }
 
-    $org = \Terminus::menu($orglist_with_id, false, "Choose organization");
+    $org = Terminus::menu($orglist_with_id, false, "Choose organization");
     if($org == '-') {
       return $default;
     }
@@ -145,14 +145,14 @@ class Input {
   public static function orglist($options = array()) {
     $orgs = array();
 
-    $allow_none = isset($options['allow_none']) ? $options['allow_none'] : true;
-    if ($allow_none) {
+    if (!isset($options['allow_none']) || (boolean)$options['allow_none']) {
       $orgs = array('-' => 'None');
     }
 
     $user = new User();
-    foreach($user->getOrganizations() as $id => $org) {
-      $orgs[$org->get('id')] = $org->get('name');
+    foreach($user->organizations->all() as $id => $org) {
+      $org_data = $org->get('organization');
+      $orgs[$org->get('id')] = $org_data->profile->name;
     }
     return $orgs;
   }
@@ -173,7 +173,7 @@ class Input {
       }
       return $args[$key];
     }
-    $org = \Terminus::menu($orglist, false, "Choose organization");
+    $org = Terminus::menu($orglist, false, "Choose organization");
     return $orglist[$org];
   }
 
@@ -250,8 +250,11 @@ class Input {
     if(isset($args[$key])) {
       return $args[$key];
     }
-    $string = \Terminus::prompt($label);
-    if(($string == '') && isset($default)) {
+    if (Terminus::getConfig('format') != 'normal') {
+      return $default;
+    }
+    $string = Terminus::prompt($label);
+    if ($string == '') {
       return $default;
     }
     return $string;
@@ -271,15 +274,12 @@ class Input {
     if (isset($args[$key])) {
       $upstream  = $upstreams->getByIdOrName($args[$key]);
       if ($upstream == null) {
-        \Terminus::error("Couldn't find upstream: %s", array($args['upstream']));
+        throw new TerminusException("Couldn't find upstream: {upstream}", array('upstream' => $args['upstream']));
       }
     } else {
       $upstream = $upstreams->get(
-        \Terminus::menu($upstreams->getMemberList('id', 'longname'))
+        Terminus::menu($upstreams->getMemberList('id', 'longname'))
       );
-    }
-    if (!$upstream && $exit) {
-      \Terminus::error('Upstream is required.');
     }
     return $upstream;
   }
@@ -293,7 +293,7 @@ class Input {
    * @return [boolean] $is_yes
    */
   public static function yesno($question, $params = array()) {
-    if(\Terminus::get_config('yes')) {
+    if(Terminus::getConfig('yes')) {
       return true;
     }
     $question = vsprintf($question, $params);

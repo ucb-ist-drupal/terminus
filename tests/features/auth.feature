@@ -18,14 +18,16 @@ Feature: auth
 
   Scenario: Check Which User I Am
     @vcr auth-whoami
+    Given I am authenticated
     When I run "terminus auth whoami"
     Then I should get:
     """
-    You are authenticated as [[username]]
+    You are authenticated as: [[username]]
     """
 
   Scenario: Logout
     @vcr auth-logout
+    Given I am authenticated
     When I run "terminus auth logout"
     Then I should get:
     """
@@ -38,5 +40,5 @@ Feature: auth
     And I run "terminus auth whoami"
     Then I should not get:
     """
-    You are authenticated as [[username]]
+    You are authenticated as: [[username]]
     """

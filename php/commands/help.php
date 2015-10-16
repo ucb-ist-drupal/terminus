@@ -1,7 +1,8 @@
 <?php
 
-use \Terminus\Utils;
-use \Terminus\Dispatcher;
+use Terminus\Dispatcher;
+use Terminus\Utils;
+use Terminus\Exceptions\TerminusException;
 
 class Help_Command extends TerminusCommand {
 
@@ -24,18 +25,18 @@ class Help_Command extends TerminusCommand {
     $command = self::find_subcommand($args);
 
     if ($command) {
-      self::show_help($command);
+      $this->show_help($command);
       exit;
     }
 
     // WordPress is already loaded, so there's no chance we'll find the command
     if (function_exists('add_filter')) {
-      \Terminus::error(sprintf("'%s' is not a registered command.", $args[0]));
+      throw new TerminusException("'{cmd}' is not a registered command.", array('cmd' => $args[0]));
     }
   }
 
   private static function find_subcommand($args) {
-    $command = \Terminus::get_root_command();
+    $command = \Terminus::getRootCommand();
 
     while (!empty($args) && $command && $command->can_have_subcommands()) {
       $command = $command->find_subcommand($args);
@@ -44,7 +45,10 @@ class Help_Command extends TerminusCommand {
     return $command;
   }
 
-  private static function show_help($command) {
+  /**
+   * @param $command
+   */
+  private function show_help($command) {
 
     $out = self::get_initial_markdown($command);
     $longdesc = $command->get_longdesc();
@@ -70,10 +74,10 @@ class Help_Command extends TerminusCommand {
 
     $out = str_replace("\t", '  ', $out);
 
-    self::pass_through_pager($out);
+    $this->pass_through_pager($out);
   }
 
-  private static function rewrap_param_desc($matches) {
+    private static function rewrap_param_desc($matches) {
     $param = $matches[1];
     $desc = self::indent("\t\t", wordwrap($matches[2]));
     return "\t$param\n$desc\n\n";
@@ -87,15 +91,14 @@ class Help_Command extends TerminusCommand {
     return implode($lines, "\n");
   }
 
-  private static function pass_through_pager($out) {
+  private function pass_through_pager($out) {
 
     if (
-      Utils\is_windows()
-      || ((boolean)Terminus::get_config('bash')) 
-      || ((boolean)Terminus::get_config('json'))
+      Utils\isWindows()
+      || in_array(Terminus::getConfig('format'), array('bash', 'json')) 
     ) {
       // No paging for Windows cmd.exe; sorry
-      Terminus::print_value($out);
+      $this->output()->outputValue($out);
       return 0;
     }
 
@@ -114,7 +117,7 @@ class Help_Command extends TerminusCommand {
   }
 
   private static function get_initial_markdown($command) {
-    $name = implode(' ', Dispatcher\get_path($command));
+    $name = implode(' ', Dispatcher\getPath($command));
 
     $binding = array(
       'name' => $name,
@@ -127,10 +130,10 @@ class Help_Command extends TerminusCommand {
       $binding['has-subcommands']['subcommands'] = self::render_subcommands($command);
     }
 
-    if ((boolean)Terminus::get_config('json')) {
+    if (Terminus::getConfig('format') == 'json') {
       $rendered_help = $binding;
     } else {
-      $rendered_help = Utils\mustache_render('man.mustache', $binding);  
+      $rendered_help = Utils\mustacheRender('man.mustache', $binding);  
     }
     return $rendered_help;
   }
@@ -141,7 +144,7 @@ class Help_Command extends TerminusCommand {
       $subcommands[$subcommand->get_name()] = $subcommand->get_shortdesc();
     }
 
-    if ((boolean)Terminus::get_config('json')) {
+    if (Terminus::getConfig('format') == 'json') {
       return $subcommands;
     }
 
@@ -167,4 +170,4 @@ class Help_Command extends TerminusCommand {
 
 }
 
-Terminus::add_command('help', 'Help_Command');
+Terminus::addCommand('help', 'Help_Command');

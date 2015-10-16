@@ -5,6 +5,7 @@
  *
  */
 
+use Terminus\Exceptions\TerminusException;
 use Terminus\Utils;
 use Terminus\Models\Organization;
 use Terminus\Models\Upstreams;
@@ -15,7 +16,6 @@ use Terminus\Auth;
 use Terminus\Helpers\Input;
 use Terminus\Models\User;
 use Symfony\Component\Finder\SplFileInfo;
-use Terminus\Loggers\Regular as Logger;
 use Terminus\Models\Workflow;
 
 class Sites_Command extends TerminusCommand {
@@ -86,11 +86,11 @@ class Sites_Command extends TerminusCommand {
     }
 
     if (count($rows) == 0) {
-      Terminus::log('You have no sites.');
+      $this->log()->warning('You have no sites.');
     }
 
-    $labels = ['name' => 'Name', 'id', 'ID', 'service_level', 'Service Level', 'framework' => 'Framework', 'created' => 'Created', 'memberships' => 'Memberships'];
-    $this->outputter->outputRecordList($rows, $labels);
+    $labels = array('name' => 'Name', 'id', 'ID', 'service_level', 'Service Level', 'framework' => 'Framework', 'created' => 'Created', 'memberships' => 'Memberships');
+    $this->output()->outputRecordList($rows, $labels);
   }
 
   /**
@@ -119,7 +119,7 @@ class Sites_Command extends TerminusCommand {
 
     $upstream = Input::upstream($assoc_args, 'upstream');
     $options['upstream_id'] = $upstream->get('id');
-    Terminus::line(sprintf("Creating new %s installation ... ", $upstream->get('longname')));
+    $this->log()->info("Creating new {upstream} installation ... ", array('upstream' => $upstream->get('longname')));
 
     $workflow = $this->sites->addSite($options);
     $workflow->wait();
@@ -129,7 +129,7 @@ class Sites_Command extends TerminusCommand {
     $final_task = $workflow->get('final_task');
     $this->sites->addSiteToCache($final_task->site_id);
 
-    Terminus::launch_self('site', array('info'), array(
+    Terminus::launchSelf('site', array('info'), array(
       'site' => $options['name'],
     ));
 
@@ -162,37 +162,45 @@ class Sites_Command extends TerminusCommand {
   public function import($args, $assoc_args) {
     $options = Sites_Command::getSiteCreateOptions($assoc_args);
 
-    $url = Input::string($assoc_args, 'url', "URL of archive to import");
+    $url = Input::string($assoc_args, 'url', 'URL of archive to import');
     if (!$url) {
-      Terminus::error("Please enter a URL.");
+      $this->logger->error('Please enter a URL.');
     }
 
-    $workflow = $this->sites->addSite($options);
+    try {
+      //If the site does not yet exist, it will throw an error.
+      $site = $this->sites->get($options['name']);
+      $this->logger->error(
+        sprintf('A site named %s already exists.', $options['name'])
+      );
+      exit;
+    } catch (\Exception $e) {
+      //Creating a new site
+      $workflow = $this->sites->addSite($options);
+      $workflow->wait();
+      $this->workflowOutput($workflow);
+
+      //Add site to SitesCache
+      $final_task = $workflow->get('final_task');
+      $site = $this->sites->addSiteToCache($final_task->site_id);
+      sleep(10); //Avoid false site-DNE errors
+    }
+
+    $workflow = $site->import($url);
     $workflow->wait();
     $this->workflowOutput($workflow);
-
-    // Add Site to SitesCache
-    $final_task = $workflow->get('final_task');
-    $this->sites->addSiteToCache($final_task->site_id);
-
-    sleep(10); //To stop erroneous site-DNE errors
-    Terminus::launch_self('site', array('import'), array(
-      'url'     => $assoc_args['url'],
-      'site'    => $options['name'],
-      'element' => 'all'
-    ));
   }
 
   /**
    * A helper function for getting/prompting for the site create options.
    *
-   * @param array $assoc_args
-   * @return array
+   * @param [array] $assoc_args Arguments from command
+   * @return [array]
    */
-  static private function getSiteCreateOptions($assoc_args) {
+  static function getSiteCreateOptions($assoc_args) {
     $options = array();
-    $options['label'] = Input::string($assoc_args, 'label', "Human-readable label for the site");
-    $suggested_name = Utils\sanitize_name( $options['label'] );
+    $options['label'] = Input::string($assoc_args, 'label', 'Human-readable label for the site');
+    $suggested_name = Utils\sanitizeName($options['label']);
 
     if (array_key_exists('name', $assoc_args)) {
       // Deprecated but kept for backwards compatibility
@@ -202,7 +210,12 @@ class Sites_Command extends TerminusCommand {
     } elseif (isset($_SERVER['TERMINUS_SITE'])) {
       $options['name'] = $_SERVER['TERMINUS_SITE'];
     } else {
-      $options['name'] = Input::string($assoc_args, 'site', "Machine name of the site; used as part of the default URL (if left blank will be $suggested_name)", $suggested_name);
+      $options['name'] = Input::string(
+        $assoc_args,
+        'site',
+        "Machine name of the site; used as part of the default URL (if left blank will be $suggested_name)",
+        $suggested_name
+      );
     }
     if (isset($assoc_args['org'])) {
       $options['organization_id'] = Input::orgid($assoc_args, 'org', false);
@@ -220,18 +233,17 @@ class Sites_Command extends TerminusCommand {
    *
    * [--location=<location>]
    * : Specify the the full path, including the filename, to the alias file you wish to create.
-   *   Without this option a default of '~/.drush/pantheon.drushrc.php' will be used.
+   *   Without this option a default of '~/.drush/pantheon.aliases.drushrc.php' will be used.
    *
    */
   public function aliases($args, $assoc_args) {
     $user = new User(new stdClass(), array());
     $print = Input::optional('print', $assoc_args, false);
-    $json = \Terminus::get_config('json');
     $location = Input::optional('location', $assoc_args, getenv("HOME").'/.drush/pantheon.aliases.drushrc.php');
 
     // Cannot provide just a directory
     if (is_dir($location)) {
-      \Terminus::error("Please provide a full path with filename, e.g. %s/pantheon.aliases.drushrc.php", $location);
+      $this->log()->error("Please provide a full path with filename, e.g. %s/pantheon.aliases.drushrc.php", $location);
       exit(1);
     }
 
@@ -250,13 +262,10 @@ class Sites_Command extends TerminusCommand {
     chmod($location, 0700);
 
     $message = $file_exists ? 'Pantheon aliases updated' : 'Pantheon aliases created';
-    Logger::coloredOutput("%2%K$message%n");
+    $this->log()->info($message);
 
-    if ($json) {
-      include $location;
-      print \Terminus\Utils\json_dump($aliases);
-    } elseif ($print) {
-      print $content;
+    if ($print) {
+      $this->output()->outputRecordList($aliases);
     }
   }
 
@@ -292,7 +301,7 @@ class Sites_Command extends TerminusCommand {
     $confirm = Input::optional('confirm', $assoc_args, false);
 
     // Start status messages.
-    if($upstream) Terminus::line('Looking for sites using '.$upstream.'.');
+    if($upstream) $this->log()->info('Looking for sites using '.$upstream.'.');
 
     foreach($sites as $site) {
       $site->fetch();
@@ -319,19 +328,19 @@ class Sites_Command extends TerminusCommand {
           if(!$confirmed) continue; // User says No, go back to start.
 
           // Backup the DB so the client can restore if something goes wrong.
-          Terminus::line('Backing up '.$site->get('name').'.');
+          $this->log()->info('Backing up '.$site->get('name').'.');
           $backup = $site->environments->get('dev')->createBackup(array('element'=>'all'));
           // Only continue if the backup was successful.
           if($backup) {
-            Terminus::success("Backup of ".$site->get('name')." created.");
-            Terminus::line('Updating '.$site->get('name').'.');
+            $this->log()->info("Backup of ".$site->get('name')." created.");
+            $this->log()->info('Updating '.$site->get('name').'.');
             // Apply the update, failure here would trigger a guzzle exception so no need to validate success.
             $response = $site->applyUpstreamUpdates($env, $updatedb, $xoption);
             $data[$site->get('name')]['status'] = 'Updated';
-            Terminus::success($site->get('name').' is updated.');
+            $this->log()->info($site->get('name').' is updated.');
           } else {
             $data[$site->get('name')]['status'] = 'Backup failed';
-            Terminus::error('There was a problem backing up '.$site->get('name').'. Update aborted.');
+            $this->log()->error('There was a problem backing up '.$site->get('name').'. Update aborted.');
           }
         }
       } else {
@@ -343,11 +352,11 @@ class Sites_Command extends TerminusCommand {
 
     if (!empty($data)) {
       sort($data);
-      $this->outputter->outputRecordList($data);
+      $this->output()->outputRecordList($data);
     } else {
-      Terminus::line('No sites in need up updating.');
+      $this->log()->info('No sites in need up updating.');
     }
   }
 }
 
-Terminus::add_command( 'sites', 'Sites_Command' );
+Terminus::addCommand( 'sites', 'Sites_Command' );

@@ -1,8 +1,7 @@
 <?php
+
 namespace Terminus;
 
-use Symfony\Component\Finder\Finder;
-use Terminus\FileCache;
 use Terminus;
 
 class Session {
@@ -12,7 +11,7 @@ class Session {
 
   public function __construct() {
 
-    $cache = Terminus::get_cache();
+    $cache = Terminus::getCache();
     $session = $cache->get_data('session');
 
 
@@ -55,8 +54,8 @@ class Session {
   }
 
   public static function setData( $data ) {
-    $cache = Terminus::get_cache();
-    Terminus::line('Saving session data');
+    $cache = Terminus::getCache();
+    Terminus::getLogger()->info('Saving session data');
     $cache->put_data('session', $data);
     $session = self::instance();
     $session->set('data',$data);

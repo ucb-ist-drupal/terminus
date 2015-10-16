@@ -2,9 +2,10 @@
 
 namespace Terminus\Models;
 
-use \Terminus\Request;
-use \Terminus\Models\Collections\Bindings;
+use Terminus\Request;
+use Terminus\Exceptions\TerminusException;
 use Terminus\Models\TerminusModel;
+use Terminus\Models\Collections\Bindings;
 
 class Environment extends TerminusModel {
   private $backups;
@@ -110,6 +111,32 @@ class Environment extends TerminusModel {
   }
 
   /**
+   * Changes connection mode
+   *
+   * @param [string] $value Connection mode, "git" or "sftp"
+   * @return [Workflow] $workflow
+   */
+  public function changeConnectionMode($value) {
+    $current_mode = $this->getConnectionMode();
+    if ($value == $current_mode) {
+      $reply = "The connection mode is already set to $value.";
+      return $reply;
+    }
+    switch ($value) {
+      case 'git':
+        $workflow_name = 'enable_git_mode';
+        break;
+      case 'sftp':
+        $workflow_name = 'enable_on_server_development';
+        break;
+    }
+
+    $params   = array('environment' => $this->get('id'));
+    $workflow = $this->site->workflows->create($workflow_name, $params);
+    return $workflow;
+  }
+
+  /**
    * Clones files from this environment to another
    *
    * @param [string] $to_env Environment to clone into
@@ -140,12 +167,41 @@ class Environment extends TerminusModel {
   }
 
   /**
+   * Commits changes to code
+   *
+   * @param [string] $commit Should be the commit message to use if committing
+   *   on server changes
+   * @return [array] $data['data']
+   */
+  public function commitChanges($commit = null) {
+    ob_start();
+    passthru('git config user.email');
+    $git_email = ob_get_clean();
+    ob_start();
+    passthru('git config user.name');
+    $git_user = ob_get_clean();
+
+    $params = array(
+      'environment' => $this->get('id'),
+      'params'      => array(
+        'message'         => $commit,
+        'committer_name'  => $git_user,
+        'committer_email' => $git_email,
+      ),
+    );
+    $workflow = $this->site->workflows->create(
+      'commit_and_push_on_server_changes',
+      $params
+    );
+    return $workflow;
+  }
+
+  /**
    * Gives connection info for this environment
    *
    * @return [array] $info
    */
   public function connectionInfo() {
-    $this->bindings->fetch();
     $info = array();
 
     // Can only SFTP into dev/multidev environments
@@ -197,7 +253,7 @@ class Environment extends TerminusModel {
     );
     $git_port     = 2222;
     $git_url      = sprintf(
-      'git://%s@%s:%s',
+      'ssh://%s@%s:%s/~/repository.git',
       $git_username,
       $git_host,
       $git_port
@@ -217,9 +273,11 @@ class Environment extends TerminusModel {
 
     $info = array_merge($info, $git_params);
 
-    $dbserver_binding = $this->bindings->getByType('dbserver');
-    if (isset($dbserver_binding[0])) {
-      $db_binding = $dbserver_binding[0];
+    $dbserver_binding = (array)$this->bindings->getByType('dbserver');
+    if (!empty($dbserver_binding)) {
+      do {
+        $db_binding = array_shift($dbserver_binding);
+      } while ($db_binding->get('environment') != $this->get('id'));
 
       $mysql_username = 'pantheon';
       $mysql_password = $db_binding->get('password');
@@ -259,16 +317,14 @@ class Environment extends TerminusModel {
       $info = array_merge($info, $mysql_params);
     }
 
-    $cacheserver_binding = $this->bindings->getByType('cacheserver');
-    if (isset($cacheserver_binding[0])) {
-      $cache_binding = $cacheserver_binding[0];
+    $cacheserver_binding = (array)$this->bindings->getByType('cacheserver');
+    if (!empty($cacheserver_binding)) {
+      do {
+        $cache_binding = array_shift($cacheserver_binding);
+      } while ($cache_binding->get('environment') != $this->get('id'));
 
       $redis_password = $cache_binding->get('password');
-      $redis_host     = $mysql_host = sprintf(
-        'cacheserver.%s.%s.drush.in',
-        $this->get('id'),
-        $this->site->get('id')
-      );
+      $redis_host     = $cache_binding->get('host');
       $redis_port     = $cache_binding->get('port');
       $redis_url      = sprintf(
         'redis://pantheon:%s@%s:%s',
@@ -437,6 +493,26 @@ class Environment extends TerminusModel {
       $this->get('dns_zone')
     );
     return $host;
+  }
+
+  /**
+   * Returns the connection mode of this environment
+   *
+   * @return [string] $connection_mode
+   */
+  public function getConnectionMode() {
+    $path = sprintf('environments/%s/on-server-development', $this->get('id'));
+    $result = \TerminusCommand::request(
+      'sites',
+      $this->site->get('id'),
+      $path,
+      'GET'
+    );
+    $mode = 'git';
+    if ($result['data']->enabled) {
+      $mode = 'sftp';
+    }
+    return $mode;
   }
 
   /**
@@ -624,66 +700,6 @@ class Environment extends TerminusModel {
   }
 
   /**
-  * On-server dev handler
-  *
-  * @param [string] $value  Connection mode, "git" or "sftp"
-  * @param [string] $commit Should be the commit message to use if committing
-  *   on server changes
-  * @return [array] $data['data']
-  */
-  public function onServerDev($value = null, $commit = null) {
-    $path = sprintf('environments/%s/on-server-development', $this->get('id'));
-    if ($commit) {
-      $path    = sprintf('%s/commit', $path);
-      $data    = array(
-        'message' => $commit,
-        'user'    => Session::getValue('user_uuid')
-      );
-      $options = array(
-        'body'    => json_encode($data),
-        'headers' => array('Content-type' => 'application/json')
-      );
-      $data    = \TerminusCommand::request(
-        'sites',
-        $this->site->get('id'),
-        $path,
-        'POST',
-        $options
-      );
-    } else {
-      if ($value == null) {
-        $data = \TerminusCommand::request(
-          'sites',
-          $this->site->get('id'),
-          $path,
-          'GET'
-        );
-      } else {
-        $enabled = ($value == 'sftp');
-        $data    = array(
-          'enabled' => $enabled,
-        );
-        $options = array(
-          'body'    => json_encode($data),
-          'headers' => array('Content-type' => 'application/json'),
-        );
-        $data    = \TerminusCommand::request(
-          'sites',
-          $this->site->get('id'),
-          $path,
-          'PUT',
-          $options
-        );
-      }
-    }
-
-    if (empty($data)) {
-      return false;
-    }
-    return $data['data'];
-  }
-
-  /**
    * Disable HTTP Basic Access authentication on the web environment
    *
    * @return [Workflow] $workflow
@@ -762,6 +778,44 @@ class Environment extends TerminusModel {
       return 'database';
     }
     return $element;
+  }
+
+  /**
+   * Load site info
+   *
+   * @param [string] $key Set to retrieve a specific attribute as named
+   * @return [array] $info
+   */
+  public function info($key = null) {
+    $path = sprintf('environments/%s', $this->get('id'));
+    $result = \TerminusCommand::request(
+      'sites',
+      $this->site->get('id'),
+      $path,
+      'GET'
+    );
+    $connection_mode = null;
+    if (isset($result['data']->on_server_development)) {
+      $connection_mode = 'git';
+      if ((boolean)$result['data']->on_server_development) {
+        $connection_mode = 'sftp';
+      }
+    }
+    $info = array(
+      'id'              => $this->get('id'),
+      'connection_mode' => $connection_mode,
+      'php_version'     => $this->site->info('php_version'),
+    );
+
+    if ($key) {
+      if (isset($info[$key])) {
+        return $info[$key];
+      } else {
+        throw new TerminusException('There is no such field.', array(), -1);
+      }
+    } else {
+      return $info;
+    }
   }
 
 }

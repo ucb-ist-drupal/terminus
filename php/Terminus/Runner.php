@@ -4,8 +4,8 @@ namespace Terminus;
 
 use Terminus;
 use Terminus\Utils;
-use Terminus\Dispatcher;
-use Terminus\KLogger;
+use Terminus\Loggers\Logger;
+use Terminus\Exceptions\TerminusException;
 
 class Runner {
   public $config;
@@ -16,6 +16,16 @@ class Runner {
   private $_early_invoke = array();
   private $global_config_path;
   private $project_config_path;
+
+  /**
+   * @var LoggerInterface
+   */
+  private $logger;
+
+  /**
+   * @var OutputterInterface
+   */
+  private $outputter;
 
   public function __construct() {
     $this->init_config();
@@ -32,7 +42,7 @@ class Runner {
   }
 
   public function find_command_to_run($args) {
-    $command = \Terminus::get_root_command();
+    $command = Terminus::getRootCommand();
 
     $cmd_path = array();
     while (!empty($args) && $command->can_have_subcommands()) {
@@ -42,9 +52,9 @@ class Runner {
       $subcommand = $command->find_subcommand($args);
 
       if (!$subcommand) {
-        return sprintf(
-          "'%s' is not a registered command. See 'terminus help'.",
-          $full_name
+        throw new TerminusException(
+          "'{cmd}' is not a registered command. See 'terminus help'.",
+          array('cmd' => $full_name)
        );
       }
 
@@ -54,31 +64,34 @@ class Runner {
     return array($command, $args, $cmd_path);
   }
 
-  public function run_command($args, $assoc_args = array()) {
-    $r = $this->find_command_to_run($args);
-    if (is_string($r)) {
-      Terminus::error($r);
-    }
-
-    list($command, $final_args, $cmd_path) = $r;
-
-    $name = implode(' ', $cmd_path);
-
-    if (isset($this->extra_config[ $name ])) {
-      $extra_args = $this->extra_config[ $name ];
-    } else {
-      $extra_args = array();
-    }
+  public function runCommand($args, $assoc_args = array()) {
 
     try {
+      list($command, $final_args, $cmd_path) = $this->find_command_to_run($args);
+      $name = implode(' ', $cmd_path);
+
+      if (isset($this->extra_config[$name])) {
+        $extra_args = $this->extra_config[$name];
+      }
+      else {
+        $extra_args = array();
+      }
+
       $command->invoke($final_args, $assoc_args, $extra_args);
-    } catch (Terminus\Iterators\Exception $e) {
-      Terminus::error($e->getMessage());
+
+    } catch (\Exception $e) {
+      if (method_exists($e, 'getReplacements')) {
+        $this->logger->error($e->getMessage(), $e->getReplacements());
+      }
+      else {
+        $this->logger->error($e->getMessage());
+      }
+      exit(1);
     }
   }
 
-  private function _run_command() {
-    $this->run_command($this->arguments, $this->assoc_args);
+  private function _runCommand() {
+    $this->runCommand($this->arguments, $this->assoc_args);
   }
 
   public function in_color() {
@@ -94,17 +107,17 @@ class Runner {
   }
 
   private function init_logger() {
-    $logger = new KLogger(array('config' => $this->config));
-    Terminus::set_logger($logger);
+    $this->logger = new Logger(array('config' => $this->config));
+    Terminus::setLogger($this->logger);
   }
 
   private function init_outputter() {
 
     // Pick an output formatter
-    if ($this->config['json']) {
+    if ($this->config['format'] == 'json') {
       $formatter = new Terminus\Outputters\JSONFormatter();
     }
-    else if ($this->config['bash']) {
+    else if ($this->config['format'] == 'bash') {
       $formatter = new Terminus\Outputters\BashFormatter();
     }
     else {
@@ -113,16 +126,16 @@ class Runner {
     // @TODO: Implement BASH output formatter
 
     // Create an output service.
-    $outputter = new Terminus\Outputters\Outputter(
+    $this->outputter = new Terminus\Outputters\Outputter(
       new Terminus\Outputters\StreamWriter('php://stdout'),
       $formatter
     );
 
-    Terminus::set_outputter($outputter);
+    Terminus::setOutputter($this->outputter);
   }
 
   private function init_config() {
-    $configurator = \Terminus::get_configurator();
+    $configurator = Terminus::getConfigurator();
 
     // Runtime config and args
     {
@@ -140,40 +153,45 @@ class Runner {
   }
 
   public function run() {
-    if (Terminus::is_test())
+    if (Terminus::isTest()) {
       return true;
+    }
 
     if (empty($this->arguments))
       $this->arguments[] = 'help';
 
     // Load bundled commands early, so that they're forced to use the same
     // APIs as non-bundled commands.
-    Utils\load_command($this->arguments[0]);
+    Utils\loadCommand($this->arguments[0]);
 
     if (isset($this->config['require'])) {
       foreach ($this->config['require'] as $path) {
-        Utils\load_file($path);
+        Utils\loadFile($path);
       }
     }
 
-    // Show synopsis if it's a composite command.
-    $r = $this->find_command_to_run($this->arguments);
-    if (is_array($r)) {
-      list($command) = $r;
+    try {
+      // Show synopsis if it's a composite command.
+      $r = $this->find_command_to_run($this->arguments);
+      if (is_array($r)) {
+        list($command) = $r;
 
-      if ($command->can_have_subcommands()) {
-        $command->show_usage();
-        exit;
+        if ($command->can_have_subcommands()) {
+          $command->show_usage();
+          exit;
+        }
       }
+    } catch (TerminusException $e) {
+      // Do nothing. Actual error handling will be done by _runCommand
     }
 
     // First try at showing man page
     if ('help' === $this->arguments[0] && (isset($this->arguments[1]))) {
-      $this->_run_command();
+      $this->_runCommand();
     }
 
     # Run the stinkin command!
-    $this->_run_command();
+    $this->_runCommand();
   }
 
 }

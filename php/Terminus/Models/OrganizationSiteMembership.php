@@ -2,7 +2,7 @@
 
 namespace Terminus\Models;
 
-use Terminus\Models\TerminusModel;
+use Terminus\Models\Organization;
 
 class OrganizationSiteMembership extends Organization {
 
@@ -21,7 +21,6 @@ class OrganizationSiteMembership extends Organization {
         )
       )
     );
-    $workflow->wait();
     return $workflow;
   }
 

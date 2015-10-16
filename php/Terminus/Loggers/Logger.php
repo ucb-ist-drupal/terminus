@@ -1,13 +1,11 @@
 <?php
 
-namespace Terminus;
+namespace Terminus\Loggers;
 
-use Terminus\JLogger as Logger;
+use Katzgrau\KLogger\Logger as KLogger;
 use Psr\Log\LogLevel;
 
-//TODO: Change this classname to Logger once the old logger is fully replaced
-class KLogger extends Logger {
-  protected $parent;
+class Logger extends KLogger {
 
   /**
    * Class constructor. Feeds in output destination from env vars
@@ -16,7 +14,7 @@ class KLogger extends Logger {
    *        [array] config Configuration options from Runner
    * @param [string] $logDirectory      File path to the logging directory
    * @param [string] $logLevelThreshold The LogLevel Threshold
-   * @return [KLogger] $this
+   * @return [Logger] $this
    */
   public function __construct(
     array $options = array(),
@@ -25,23 +23,19 @@ class KLogger extends Logger {
   ) {
     $config = $options['config'];
     unset($options['config']);
+    $options['dateFormat'] = 'Y-m-d H:i:s';
 
     if ($config['debug']) {
       $logLevelThreshold = LogLevel::DEBUG;
     }
 
     if (!isset($options['logFormat'])) {
-      if ($config['json'] != null) {
-        $options['logFormat'] = 'json';
-      }
-      if ($config['bash'] != null) {
-        $options['logFormat'] = 'bash';
-      }
+      $options['logFormat'] = $config['format'];
     }
 
     if (isset($_SERVER['TERMINUS_LOG_DIR'])) {
       $logDirectory = $_SERVER['TERMINUS_LOG_DIR'];
-    } elseif ($config['silent']) {
+    } elseif ($config['format'] == 'silent') {
       $logDirectory = ini_get('error_log');
       if ($logDirectory == '') {
         die(
@@ -52,7 +46,6 @@ class KLogger extends Logger {
     }
 
     parent::__construct($logDirectory, $logLevelThreshold, $options);
-    $this->parent = $this->extractParent();
   }
 
   /**
@@ -64,16 +57,24 @@ class KLogger extends Logger {
     * @return [void]
     */
   public function log($level, $message, array $context = array()) {
-    $parent = $this->parent;
-    if ($parent->logLevels[$parent->logLevelThreshold] < $parent->logLevels[$level]) {
+    if (
+      isset($this->logLevelThreshold)
+      && ($this->logLevels[$this->logLevelThreshold] < $this->logLevels[$level])
+    ) {
       return;
     }
-    if ($parent->options['logFormat'] == 'json') {
+
+    // Replace the context variables into the message per PSR spec:
+    // https://github.com/php-fig/fig-standards/blob/master/accepted/PSR-3-logger-interface.md#12-message
+    $message = $this->interpolate($message, $context);
+
+
+    if (isset($this->options) && $this->options['logFormat'] == 'json') {
       $message = $this->formatJsonMessages($level, $message, $context);
-    } elseif ($parent->options['logFormat'] == 'bash') {
+    } elseif (isset($this->options) && $this->options['logFormat'] == 'bash') {
       $message = $this->formatBashMessages($level, $message, $context);
     } else {
-      $message = $this->formatMessages($level, $message, $context);
+      $message = $this->formatMessage($level, $message, $context);
     }
     $this->write($message);
   }
@@ -86,23 +87,6 @@ class KLogger extends Logger {
   public function setBufferHandle() {
     $handle_name = strtoupper(substr($this->getLogFilePath(), 6));
     $this->fileHandle = constant($handle_name);
-  }
-
-  /**
-   * Extracts private data from the parent class
-   *
-   * @return [stdClass] $parent
-   */
-  private function extractParent() {
-    $array  = (array)$this;
-    array_shift($array);
-    $parent = new \stdClass();
-    foreach ($array as $key => $value) {
-      //All these keys begin with a null. We need to cut them off so they can be used.
-      $property_name = substr(str_replace('Katzgrau\KLogger\Logger', '', $key), 2);
-      $parent->$property_name = $value;
-    }
-    return $parent;
   }
 
   /**
@@ -144,18 +128,24 @@ class KLogger extends Logger {
     * @param  [array]  $context The context
     * @return [string] $message
     */
-  private function formatMessages($level, $message, $context) {
-    $parent = $this->parent;
-    if ($parent->options['logFormat']) {
+  protected function formatMessage($level, $message, $context) {
+    if (
+      isset($this->options)
+      && in_array($this->options['logFormat'], array('bash', 'json'))
+    ) {
       $parts   = $this->getMessageParts($level, $message, $context);
-      $message = $parent->options['logFormat'];
+      $message = $this->options['logFormat'];
       foreach ($parts as $part => $value) {
         $message = str_replace('{'.$part.'}', $value, $message);
       }
     } else {
-      $message = "[{$this->getTimestamp()}] [{$level}] {$message}";
+      $message = "[{$this->getTimestamp()}] [$level] $message";
     }
-    if ($parent->options['appendContext'] && ! empty($context)) {
+    if (
+      isset($this->options)
+      && $this->options['appendContext']
+      && ! empty($context)
+    ) {
       $message .= PHP_EOL . $this->indent($this->contextToString($context));
     }
 
@@ -187,12 +177,26 @@ class KLogger extends Logger {
    * @return [string] $date
    */
   private function getTimestamp() {
-    $date_format = 'Y-m-d H:i:s';
-    if (isset($this->options['dateFormat'])) {
-      $date_format = $this->options['dateFormat'];
-    }
-    $date = date($date_format);
+    $date = date($this->options['dateFormat']);
     return $date;
+  }
+
+  /**
+   * Interpolates context variables per the PSR spec.
+   *
+   * @param string $message The message containing replacements in the form {key}
+   * @param array $context The array containing the values to be substituted.
+   * @return string
+   */
+  private function interpolate($message, $context) {
+    // build a replacement array with braces around the context keys
+    $replace = array();
+    foreach ($context as $key => $val) {
+      $replace['{' . $key . '}'] = $val;
+    }
+
+    // interpolate replacement values into the message and return
+    return strtr($message, $replace);
   }
 
 }

@@ -1,12 +1,7 @@
 <?php
 
-use Behat\Behat\Context\ClosuredContextInterface;
-use Behat\Behat\Context\TranslatedContextInterface;
 use Behat\Behat\Context\BehatContext;
-use Behat\Behat\Exception\PendingException;
 use Behat\Gherkin\Node\PyStringNode;
-use Behat\Gherkin\Node\TableNode;
-use Behat\Gherkin\Node\ScenarioNode;
 
 /**
  * Features context for Behat feature testing
@@ -363,7 +358,7 @@ class FeatureContext extends BehatContext {
    * @return [string] Output from command run
    */
   public function iGetInfoForTheSite($site, $return_hash = false) {
-    $return = $this->iRun("terminus site info --site=$site --bash");
+    $return = $this->iRun("terminus site info --site=$site --format=bash");
     if(!$return_hash) {
       return $return;
     }
@@ -700,7 +695,7 @@ class FeatureContext extends BehatContext {
    */
   private function _getTags($event) {
     $unformatted_tags = $event->getScenario()->getTags();
-    $tags = [];
+    $tags = array();
 
     foreach($unformatted_tags as $tag) {
       $tag_elements = explode(' ', $tag);

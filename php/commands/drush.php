@@ -1,6 +1,7 @@
 <?php
 
 use Terminus\Dispatcher;
+use Terminus\Exceptions\TerminusException;
 use Terminus\Utils;
 use Terminus\CommandWithSSH;
 use Terminus\Models\Collections\Sites;
@@ -30,8 +31,7 @@ class Drush_Command extends CommandWithSSH {
     $sites = new Sites();
     $site = $sites->get(Input::sitename($assoc_args));
     if (!$site) {
-      Terminus::error("Command could not be completed. Unknown site specified.");
-      exit;
+      throw new TerminusException("Command could not be completed. Unknown site specified.");
     }
 
     $server = Array(
@@ -63,10 +63,24 @@ class Drush_Command extends CommandWithSSH {
         $flags .= "--$k ";
       }
     }
-    $this->logger->info(vsprintf("Running drush %s %s on %s-%s", array($command, $flags, $site->get('name'), $environment)));
-    $this->send_command($server, 'drush', $args, $assoc_args );
+    if (in_array(\Terminus::getConfig('format'), array('bash', 'json', 'silent'))) {
+      $assoc_args['pipe'] = 1;
+    }
+    $this->log()->info(
+      "Running drush {cmd} {flags} on {site}-{env}",
+      array(
+        'cmd' => $command,
+        'flags' => $flags,
+        'site' => $site->get('name'),
+        'env' => $environment
+      )
+    );
+    $result = $this->send_command($server, 'drush', $args, $assoc_args);
+    if (Terminus::getConfig('format') != 'normal') {
+      $this->output()->outputRecordList($result);
+    }
   }
 
 }
 
-Terminus::add_command( 'drush', 'Drush_Command' );
+Terminus::addCommand( 'drush', 'Drush_Command' );

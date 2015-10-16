@@ -2,9 +2,9 @@
 
 namespace Terminus\Models\Collections;
 
-use \TerminusCommand;
-use Terminus\Models\Collections\TerminusCollection;
+use TerminusCommand;
 use Terminus\Models\Workflow;
+use Terminus\Models\Collections\TerminusCollection;
 
 class Workflows extends TerminusCollection {
   protected $environment;
@@ -26,7 +26,7 @@ class Workflows extends TerminusCollection {
     }
     $params = array_merge($this->getFetchArgs(), $options['params']);
 
-    $results = TerminusCommand::simple_request(
+    $results = TerminusCommand::simpleRequest(
       $this->getFetchUrl(),
       array(
         'method'   => 'post',

@@ -462,3 +462,61 @@
             ETag: 'W/"4kiTvSSKO34heLlkJX+T5w=="'
             Vary: Accept-Encoding
         body: '{"dev": {"target_ref": "refs/heads/master", "watchers": 1, "diffstat": {}, "on_server_development": false, "environment_created": 1434487064, "dns_zone": "onebox.pantheon.io", "randseed": "TFW6INOL92G200QHU1FDDAUJO465G5QW", "number_allow_domains": 20, "php_version": 53, "php_channel": "testing", "target_commit": "3d8eec29de3c35e7c8bc6e857ebba5fcdacf414e", "styx_cluster": "styx-sara-onebox1.onebox.pantheon.io", "lock": {"username": null, "password": null, "locked": false}}, "test": {"environment_created": 1434487064, "dns_zone": "onebox.pantheon.io", "randseed": "0YOG8WWQLRCQI0TLS6LZ2J5O8RHVJ9OX", "target_ref": "refs/tags/pantheon_test_1", "lock": {"username": null, "password": null, "locked": false}, "target_commit": "b4c387098f7f26182a79e9bd7038f3713afdd25b", "styx_cluster": "styx-onebox.onebox.pantheon.io"}, "live": {"environment_created": 1434487065, "dns_zone": "onebox.pantheon.io", "randseed": "I0W66V72BY2EIEC7M9KP9I07KL0BOKOY", "lock": {"username": null, "password": null, "locked": false}, "pingdom": 0, "styx_cluster": "styx-onebox.onebox.pantheon.io"}}'
+-
+    request:
+        method: POST
+        url: 'https://onebox/api/sites/88a4668f-3413-417d-b044-6f4aee2e127e/environments/dev/workflows'
+        headers:
+            Host: onebox
+            Expect: null
+            Accept: null
+            User-Agent: 'Terminus/0.8.0 (php_version=5.5.27&script=boot-fs.php)'
+            Cookie: 'X-Pantheon-Session=25069e79-eae7-4d41-8925-1f728a114cb8:0bde1b84-57fb-11e5-97ba-bc764e117665:hmgNxymuJZOZR9t62VCNZ'
+            Content-type: application/json
+        body: '{"type":"do_export","params":{"entry_type":"backup","code":true,"database":true,"files":true,"ttl":31536000}}'
+    response:
+        status:
+            http_version: '1.1'
+            code: '202'
+            message: Accepted
+        headers:
+            Server: nginx
+            Date: 'Wed, 23 Sep 2015 00:23:20 GMT'
+            Content-Type: 'application/json; charset=utf-8'
+            Transfer-Encoding: chunked
+            Connection: keep-alive
+            X-Pantheon-Trace-Id: 4aa1a6f0-6189-11e5-a139-c95d7f8f209a
+            X-Frame-Options: deny
+            Access-Control-Allow-Methods: GET
+            Access-Control-Allow-Headers: 'Origin, Content-Type, Accept'
+            Vary: Accept-Encoding
+        body: '{"environment_id": "dev", "params": {"files": true, "entry_type": "backup", "code": true, "ttl": 31536000, "database": true}, "role": "owner", "site_id": "88a4668f-3413-417d-b044-6f4aee2e127e", "task_ids": ["4aa8c246-6189-11e5-b495-bc764e117665", "4aaa133a-6189-11e5-b495-bc764e117665", "4aad018a-6189-11e5-b495-bc764e117665"], "trace_id": "4aa1a6f0-6189-11e5-a139-c95d7f8f209a", "type": "do_export", "user_id": "25069e79-eae7-4d41-8925-1f728a114cb8", "id": "4aa6cd9c-6189-11e5-b495-bc764e117665", "key": "1442966400", "waiting_for_task_id": "4aa8c246-6189-11e5-b495-bc764e117665", "keep_forever": false, "phase": "created", "queued_time": null, "run_time": null, "created_at": 1442967799.552758, "reason": "", "environment": "dev", "final_task_id": null, "result": null, "total_time": null, "active_description": "Export code, files and database from \"dev\"", "description": "Export code, files and database from \"dev\"", "step": 1, "number_of_tasks": 3, "trace_log_url": "https://logs.onebox.getpantheon.com:9443//#/dashboard/file/Trace_Id.json?trace_id=4aa1a6f0-6189-11e5-a139-c95d7f8f209a&from_iso_date=2015-09-23T00:18:19.552758Z&to_iso_date=now", "user": {"created_at": 1435781178, "email": "devuser@pantheon.io", "password": "SCRUBBED", "id": "25069e79-eae7-4d41-8925-1f728a114cb8"}, "user_email": "devuser@pantheon.io", "waiting_for_task": {"allow_concurrent": true, "environment": "dev", "fn_name": "queue_jenkins_task", "params": {"files": 0, "code": 1, "job_id": "4aa8c246-6189-11e5-b495-bc764e117665", "database": 0, "bucket": "onebox-pantheon-backups", "scheduled_for": 1442967799, "site": "88a4668f-3413-417d-b044-6f4aee2e127e", "host": "ellis.onebox.getpantheon.com", "task_type": "backup_priority", "env": "dev", "ttl": 31536000, "folder": "1442967799_backup", "type": "backup"}, "site_id": "88a4668f-3413-417d-b044-6f4aee2e127e", "trace_id": "4aa1a6f0-6189-11e5-a139-c95d7f8f209a", "user_id": "25069e79-eae7-4d41-8925-1f728a114cb8", "workflow_id": "4aa6cd9c-6189-11e5-b495-bc764e117665", "id": "4aa8c246-6189-11e5-b495-bc764e117665", "key": "1442966400", "responses": [], "created_at": 1442967799.565575, "queued_time": null, "run_time": null, "phase": "created", "result": null, "total_time": null, "internal_reason": "", "build_url": null, "messages": {}, "reason": "", "trace_log_url": "https://logs.onebox.getpantheon.com:9443//#/dashboard/file/Trace_Id.json?trace_id=4aa1a6f0-6189-11e5-a139-c95d7f8f209a&from_iso_date=2015-09-23T00:18:19.565575Z&to_iso_date=now", "type": "backup_priority"}}'
+-
+    request:
+        method: POST
+        url: 'https://onebox/api/sites/88a4668f-3413-417d-b044-6f4aee2e127e/environments/dev/workflows'
+        headers:
+            Host: onebox
+            Expect: null
+            Accept: null
+            User-Agent: 'Terminus/0.8.0 (php_version=5.5.27&script=boot-fs.php)'
+            Cookie: 'X-Pantheon-Session=25069e79-eae7-4d41-8925-1f728a114cb8:0bde1b84-57fb-11e5-97ba-bc764e117665:hmgNxymuJZOZR9t62VCNZ'
+            Content-type: application/json
+        body: '{"type":"apply_upstream_updates","params":{"updatedb":true,"xoption":"theirs"}}'
+    response:
+        status:
+            http_version: '1.1'
+            code: '202'
+            message: Accepted
+        headers:
+            Server: nginx
+            Date: 'Wed, 23 Sep 2015 00:23:22 GMT'
+            Content-Type: 'application/json; charset=utf-8'
+            Transfer-Encoding: chunked
+            Connection: keep-alive
+            X-Pantheon-Trace-Id: 4b941d40-6189-11e5-a139-c95d7f8f209a
+            X-Frame-Options: deny
+            Access-Control-Allow-Methods: GET
+            Access-Control-Allow-Headers: 'Origin, Content-Type, Accept'
+            Vary: Accept-Encoding
+        body: '{"environment_id": "dev", "params": {"xoption": "theirs", "updatedb": true}, "role": "owner", "site_id": "88a4668f-3413-417d-b044-6f4aee2e127e", "task_ids": ["4b9c2698-6189-11e5-b495-bc764e117665", "4b9d2e8a-6189-11e5-b495-bc764e117665", "4bb58002-6189-11e5-b495-bc764e117665", "4bb90574-6189-11e5-b495-bc764e117665", "4bbd1556-6189-11e5-b495-bc764e117665"], "trace_id": "4b941d40-6189-11e5-a139-c95d7f8f209a", "type": "apply_upstream_updates", "user_id": "25069e79-eae7-4d41-8925-1f728a114cb8", "id": "4b99d3b6-6189-11e5-b495-bc764e117665", "key": "1442966400", "waiting_for_task_id": "4b9c2698-6189-11e5-b495-bc764e117665", "keep_forever": false, "phase": "created", "queued_time": null, "run_time": null, "created_at": 1442967801.145439, "reason": "", "environment": "dev", "final_task_id": null, "result": null, "total_time": null, "active_description": "Apply upstream updates", "description": "Apply upstream updates", "step": 1, "number_of_tasks": 5, "trace_log_url": "https://logs.onebox.getpantheon.com:9443//#/dashboard/file/Trace_Id.json?trace_id=4b941d40-6189-11e5-a139-c95d7f8f209a&from_iso_date=2015-09-23T00:18:21.145439Z&to_iso_date=now", "user": {"created_at": 1435781178, "email": "devuser@pantheon.io", "password": "SCRUBBED", "id": "25069e79-eae7-4d41-8925-1f728a114cb8"}, "user_email": "devuser@pantheon.io", "waiting_for_task": {"environment": "dev", "fn_name": "trigger_task", "params": {"environment": "dev", "site_id": "88a4668f-3413-417d-b044-6f4aee2e127e", "task_type": "apply_upstream_updates", "xoption": "theirs"}, "site_id": "88a4668f-3413-417d-b044-6f4aee2e127e", "trace_id": "4b941d40-6189-11e5-a139-c95d7f8f209a", "user_id": "25069e79-eae7-4d41-8925-1f728a114cb8", "workflow_id": "4b99d3b6-6189-11e5-b495-bc764e117665", "id": "4b9c2698-6189-11e5-b495-bc764e117665", "key": "1442966400", "responses": [], "created_at": 1442967801.160668, "queued_time": null, "run_time": null, "phase": "created", "allow_concurrent": false, "result": null, "total_time": null, "internal_reason": "", "build_url": null, "messages": {}, "reason": "", "trace_log_url": "https://logs.onebox.getpantheon.com:9443//#/dashboard/file/Trace_Id.json?trace_id=4b941d40-6189-11e5-a139-c95d7f8f209a&from_iso_date=2015-09-23T00:18:21.160668Z&to_iso_date=now", "type": "apply_upstream_updates"}}'

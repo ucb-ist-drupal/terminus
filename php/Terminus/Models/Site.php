@@ -2,20 +2,16 @@
 
 namespace Terminus\Models;
 
-use \Terminus;
-use Terminus\Request;
-use Terminus\Deploy;
-use \TerminusCommand;
-use \Terminus\Models\Environment;
-use \Terminus\Models\SiteUserMembership;
+use Terminus;
+use TerminusCommand;
+use Terminus\Exceptions\TerminusException;
 use Terminus\Models\Organization;
-use Terminus\Models\User;
+use Terminus\Models\TerminusModel;
 use Terminus\Models\Collections\Environments;
-use Terminus\Models\Collections\SiteUserMemberships;
 use Terminus\Models\Collections\OrganizationSiteMemberships;
 use Terminus\Models\Collections\SiteOrganizationMemberships;
+use Terminus\Models\Collections\SiteUserMemberships;
 use Terminus\Models\Collections\Workflows;
-use Terminus\Models\TerminusModel;
 
 class Site extends TerminusModel {
   public $bindings;
@@ -88,7 +84,7 @@ class Site extends TerminusModel {
    */
   public function addTag($tag, $org) {
     $params   = array($tag => array('sites' => array($this->get('id'))));
-    $response = TerminusCommand::simple_request(
+    $response = TerminusCommand::simpleRequest(
       sprintf('organizations/%s/tags', $org),
       array('method' => 'put', 'data' => $params)
     );
@@ -148,7 +144,7 @@ class Site extends TerminusModel {
    */
   public function bindings($type = null) {
     if (empty($this->bindings)) {
-      $response = TerminusCommand::simple_request(
+      $response = TerminusCommand::simpleRequest(
         'sites/' . $this->get('id') . '/' . $bindings
       );
       foreach ($response['data'] as $id => $binding) {
@@ -194,7 +190,7 @@ class Site extends TerminusModel {
    * @return [array] $response
    */
   public function delete() {
-    $response = TerminusCommand::simple_request(
+    $response = TerminusCommand::simpleRequest(
       'sites/' . $this->get('id'),
       array('method' => 'delete')
     );
@@ -255,7 +251,7 @@ class Site extends TerminusModel {
    * @return [Site] $this
    */
   public function fetch($paged = true) {
-    $response         = TerminusCommand::simple_request(
+    $response         = TerminusCommand::simpleRequest(
       sprintf('sites/%s?site_state=true', $this->get('id'))
     );
     $this->attributes = $response['data'];
@@ -283,7 +279,7 @@ class Site extends TerminusModel {
    */
   public function getFeature($feature) {
     if (!isset($this->features)) {
-      $response       = TerminusCommand::simple_request(
+      $response       = TerminusCommand::simpleRequest(
         sprintf('sites/%s/features', $this->get('id'))
       );
       $this->features = (array)$response['data'];
@@ -339,44 +335,66 @@ class Site extends TerminusModel {
    * @return [stdClass] $response['data']
    */
   public function getUpstreamUpdates() {
-    $response = TerminusCommand::simple_request(
+    $response = TerminusCommand::simpleRequest(
       'sites/' . $this->get('id') .  '/code-upstream-updates'
     );
     return $response['data'];
   }
 
   /**
-   * Imports an archive
+   * Imports a full-site archive
    *
-   * @param [string] $url     URL to import data from
-   * @param [string] $element Which element to import from URL
+   * @param [string] $url URL to import data from
    * @return [Workflow] $workflow
    */
-  public function import($url, $element) {
-    $data = array(
+  public function import($url) {
+    $params   = array(
       'url'      => $url,
-      'code'     => 0,
-      'database' => 0,
-      'files'    => 0,
-      'updatedb' => 0
+      'code'     => 1,
+      'database' => 1,
+      'files'    => 1,
+      'updatedb' => 1,
     );
-
-    if ($element == 'all') {
-      $data = array_merge(
-        $data,
-        array('code' => 1, 'database' => 1, 'files' => 1, 'updatedb' => 1)
-      );
-    } elseif ($element == 'database') {
-      $data = array_merge($data, array('database' => 1, 'updatedb' => 1));
-    } else {
-      $data[$element] = 1;
-    }
 
     $workflow = $this->workflows->create(
       'do_import',
       array(
         'environment' => 'dev',
-        'params' => $data
+        'params'      => $params,
+      )
+    );
+    return $workflow;
+  }
+
+  /**
+   * Imports a database archive
+   *
+   * @param [string] $url URL to import data from
+   * @return [Workflow] $workflow
+   */
+  public function importDatabase($url) {
+    $workflow = $this->workflows->create(
+      'import_database',
+      array(
+        'environment' => 'dev',
+        'params'      => array('url' => $url),
+      )
+    );
+    return $workflow;
+  }
+
+  /**
+   * Imports a file archive
+   *
+   * @param [string] $url URL to import data from
+   * @return [Workflow] $workflow
+   */
+  public function importFiles($url) {
+    $workflow = $this->workflows->create(
+      'import_files',
+      array(
+        'environment' => 'dev',
+        'params'      => array('url' => $url),
       )
     );
     return $workflow;
@@ -423,7 +441,7 @@ class Site extends TerminusModel {
    */
   public function newRelic() {
     $path     = 'new-relic';
-    $response = TerminusCommand::simple_request(
+    $response = TerminusCommand::simpleRequest(
       'sites/' . $this->get('id') . '/new-relic'
     );
     return $response['data'];
@@ -461,7 +479,7 @@ class Site extends TerminusModel {
    * @return [array] $response
    */
   public function removeTag($tag, $org) {
-    $response = TerminusCommand::simple_request(
+    $response = TerminusCommand::simpleRequest(
       sprintf(
         'organizations/%s/tags/%s/sites?entity=%s',
         $org,
@@ -482,7 +500,7 @@ class Site extends TerminusModel {
   public function setOwner($owner = null) {
     $new_owner = $this->user_memberships->get($owner);
     if ($new_owner == null) {
-      Terminus::error(
+      throw new TerminusException(
         'The new owner must first be a member of the team. Try adding with `site team`'
       );
     }
@@ -504,7 +522,7 @@ class Site extends TerminusModel {
    */
   public function tips() {
     $path = 'code-tips';
-    $data = \TerminusCommand::request('sites', $this->get('id'), $path, 'GET');
+    $data = TerminusCommand::request('sites', $this->get('id'), $path, 'GET');
     return $data['data'];
   }
 

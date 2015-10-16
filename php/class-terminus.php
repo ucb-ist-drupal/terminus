@@ -1,76 +1,122 @@
 <?php
 
-use \Terminus\Utils;
-use \Terminus\Dispatcher;
-use \Terminus\FileCache;
+use Terminus\Configurator;
+use Terminus\Dispatcher;
+use Terminus\FileCache;
+use Terminus\Runner;
+use Terminus\Utils;
+use Terminus\Exceptions\TerminusException;
 
 /**
  * Various utilities for Terminus commands.
  */
 class Terminus {
   private static $configurator;
-  private static $hooks = array();
+  private static $hooks        = array();
   private static $hooks_passed = array();
   private static $logger;
   private static $outputter;
 
   /**
-   * Set the logger instance.
+   * Add a command to the terminus list of commands
    *
-   * @param [object] $logger
+   * @param [string] $name  The name of the command that will be used in the CLI
+   * @param [string] $class The command implementation
+   * @return [void]
    */
-  static function set_logger($logger) {
-    self::$logger = $logger;
-  }
+  static function addCommand($name, $class) {
+    $path      = preg_split('/\s+/', $name);
+    $leaf_name = array_pop($path);
+    $full_path = $path;
+    $command   = self::getRootCommand();
 
-  static function get_configurator() {
-    static $configurator;
-
-    if(!$configurator) {
-      $configurator = new Terminus\Configurator(TERMINUS_ROOT . '/php/config-spec.php');
-    }
-
-    return $configurator;
-  }
-
-  static function get_root_command() {
-    static $root;
-
-    if(!$root) {
-      $root = new Dispatcher\RootCommand;
-    }
-
-    return $root;
-  }
-
-  static function get_runner() {
-    // the entire process needs an exception wrapper
-    try {
-      static $runner;
-
-      if(!isset($runner) || !$runner) {
-        $runner = new Terminus\Runner();
+    while (!empty($path)) {
+      $subcommand_name = $path[0];
+      $subcommand      = $command->find_subcommand($path);
+      // Create an empty container
+      if (!$subcommand) {
+        $subcommand = new Dispatcher\CompositeCommand(
+          $command,
+          $subcommand_name,
+          new DocParser('')
+        );
+        $command->add_subcommand($subcommand_name, $subcommand);
       }
-
-      return $runner;
-    } catch(\Exception $e) {
-      Terminus::error($e->getMessage());
+      $command = $subcommand;
     }
+
+    $leaf_command = Dispatcher\CommandFactory::create(
+      $leaf_name,
+      $class,
+      $command
+    );
+
+    if (!$command->can_have_subcommands()) {
+      throw new TerminusException(
+        sprintf(
+          "'%s' can't have subcommands.",
+          implode(' ', Dispatcher\getPath($command))
+        )
+      );
+    }
+    $command->add_subcommand($leaf_name, $leaf_command);
   }
 
   /**
-   * @return FileCache
+   * Returns a colorized string
+   *
+   * @param [string] $string Message to colorize for output
+   * @return [string] $colorized_string
    */
-  public static function get_cache() {
+  static function colorize($string) {
+    $colorized_string = \cli\Colors::colorize(
+      $string,
+      self::getRunner()->in_color()
+    );
+    return $colorized_string;
+  }
+
+  /**
+   * Asks for confirmation before running a destructive operation.
+   *
+   * @param [string] $question Prompt text
+   * @param [array]  $params   Elements to interpolate into the prompt text
+   * @return [boolean] True if prompt is accepted
+   */
+  static function confirm(
+    $question,
+    $params = array()
+  ) {
+    if (self::getConfig('yes')) {
+      return true;
+    }
+    $question = vsprintf($question, $params);
+    fwrite(STDOUT, $question . ' [y/n] ');
+    $answer = trim(fgets(STDIN));
+
+    if ($answer != 'y') {
+      exit(0);
+    }
+    return true;
+  }
+
+  /**
+   * Retrieves and returns the file cache
+   *
+   * @return [FileCache] $cache
+   */
+  public static function getCache() {
     static $cache;
 
-    if(!$cache) {
+    if (!$cache) {
       $home = getenv('HOME');
-      if(!$home) {
+      if (!$home) {
         // sometime in windows $HOME is not defined
         $home = getenv('HOMEDRIVE') . '/' . getenv('HOMEPATH');
       }
-      $dir = getenv('TERMINUS_CACHE_DIR') ? : "$home/.terminus/cache";
+      if (!getenv('TERMINUS_CACHE_DIR')) {
+        $dir = "$home/.terminus/cache";
+      }
 
       // 6 months, 300mb
       $cache = new FileCache($dir, 86400, 314572800);
@@ -80,394 +126,319 @@ class Terminus {
     return $cache;
   }
 
-  static function colorize($string) {
-    return \cli\Colors::colorize($string, self::get_runner()->in_color());
-  }
-
   /**
-   * Add a command to the terminus list of commands
+   * Retrieves the config array or a single element from it
    *
-   * @param string $name The name of the command that will be used in the CLI
-   * @param string $class The command implementation
-   * @param array $args An associative array with additional parameters:
-   *   'before_invoke' => callback to execute before invoking the command
+   * @param [string] $key Hash key of element to retrieve from config
+   * @return [mixed] $config
    */
-  static function add_command($name, $class, $args = array()) {
-
-    $path = preg_split('/\s+/', $name);
-
-    $leaf_name = array_pop($path);
-    $full_path = $path;
-
-    $command = self::get_root_command();
-
-    while (!empty($path)) {
-      $subcommand_name = $path[0];
-      $subcommand = $command->find_subcommand($path);
-      // create an empty container
-      if(!$subcommand) {
-        $subcommand = new Dispatcher\CompositeCommand($command, $subcommand_name,
-          new \Terminus\DocParser(''));
-        $command->add_subcommand($subcommand_name, $subcommand);
-      }
-
-      $command = $subcommand;
-    }
-
-    $leaf_command = Dispatcher\CommandFactory::create($leaf_name, $class, $command);
-
-    if(! $command->can_have_subcommands()) {
-      throw new Exception(sprintf("'%s' can't have subcommands.",
-        implode(' ' , Dispatcher\get_path($command))));
-    }
-    $command->add_subcommand($leaf_name, $leaf_command);
-  }
-
-  /**
-   * Prompt the user for input
-   * TODO: Remove this when all old logger calls have been replaced with calls directly to logger class
-   *
-   * @param string $message
-   */
-  static function prompt($message = '', $params = array(), $default=null) {
-    if(!empty($params)) {
-      $message = vsprintf($message, $params);
-    }
-    $response = \cli\prompt($message);
-    if(empty($response) AND $default) {
-      $response = $default;
-    }
-    return $response;
-  }
-
-  /**
-   * Display a message in the CLI and end with a newline
-   * TODO: Create and use outputter for this
-   *
-   * @param string $message
-   */
-  static function line($message = '', $params = array()) {
-    if(!empty($params)) {
-      $message = vsprintf($message, $params);
-    }
-    echo \cli\line($message);
-  }
-
-  /**
-   * Log an informational message.
-   * TODO: Remove this when all old logger calls have been replaced with calls directly to logger class
-   *
-   * @param string $message
-   */
-  static function log($message, $params = array()) {
-    if(!empty($params)) {
-      $message = vsprintf($message, $params);
-    }
-    self::$logger->info($message);
-  }
-
-  /**
-   * Display a success in the CLI and end with a newline
-   * TODO: Create and use outputter for this
-   *
-   * @param string $message
-   */
-  static function success($message, $params = array()) {
-    if(!empty($params)) {
-      $message = vsprintf($message, $params);
-    }
-    self::$logger->info($message);
-  }
-
-  /**
-   * Display a warning in the CLI and end with a newline
-   * TODO: Remove this when all old logger calls have been replaced with calls directly to logger class
-   *
-   * @param string $message
-   */
-  static function warning($message, $params = array()) {
-    if(!empty($params)) {
-      $message = vsprintf($message, $params);
-    }
-    self::$logger->warning(self::error_to_string($message));
-  }
-
-  /**
-   * Display an error in the CLI and end with a newline
-   * TODO: Create and use outputter for this
-   *
-   * @param string $message
-   */
-  static function failure($message, $params = array()) {
-    if(!empty($params)) {
-      $message = vsprintf($message, $params);
-    }
-    if(! isset(self::get_runner()->assoc_args[ 'completions' ])) {
-      self::$logger->error(self::error_to_string($message));
-    }
-
-    exit(1);
-  }
-
-  /**
-   * Display an error in the CLI and end with a newline
-   * TODO: Remove this when all old logger calls have been replaced with calls directly to logger class
-   *
-   * @param string $message
-   */
-  static function error($message, $params = array()) {
-    if(!empty($params)) {
-      $message = vsprintf($message, $params);
-    }
-    if(! isset(self::get_runner()->assoc_args[ 'completions' ])) {
-      self::$logger->error(self::error_to_string($message));
-    }
-
-    exit(1);
-  }
-
-  /**
-   * Ask for confirmation before running a destructive operation.
-   * TODO: Create and use outputter for this
-   */
-  static function confirm($question, $assoc_args = array(), $params = array()) {
-      if(\Terminus::get_config('yes')) return true;
-      $question = vsprintf($question, $params);
-      fwrite(STDOUT, $question . " [y/n] ");
-
-      $answer = trim(fgets(STDIN));
-
-      if('y' != $answer)
-        exit;
-      return true;
-  }
-
-  /**
-   * Read value from a positional argument or from STDIN.
-   *
-   * @param array $args The list of positional arguments.
-   * @param int $index At which position to check for the value.
-   *
-   * @return string
-   */
-  public static function get_value_from_arg_or_stdin($args, $index) {
-    if(isset($args[ $index ])) {
-      $raw_value = $args[ $index ];
+  static function getConfig($key = null) {
+    if (is_null($key)) {
+      $config = self::getRunner()->config;
+    } elseif (!isset(self::getRunner()->config[$key])) {
+      self::getLogger()->warning(
+        'Unknown config option "{key}".',
+        array('key' => $key)
+      );
+      $config = null;
     } else {
-      // We don't use file_get_contents() here because it doesn't handle
-      // Ctrl-D properly, when typing in the value interactively.
-      $raw_value = '';
-      while (($line = fgets(STDIN)) !== false) {
-        $raw_value .= $line;
-      }
+      $config = self::getRunner()->config[$key];
     }
-
-    return $raw_value;
+    return $config;
   }
 
   /**
-   * Read a value, from various formats.
+   * Retrieves the configurator, creating it if DNE
    *
-   * @param mixed $value
-   * @param array $assoc_args
+   * @return [Configurator] $configurator
    */
-  static function read_value($raw_value, $assoc_args = array()) {
-    if(isset($assoc_args['format']) && 'json' == $assoc_args['format']) {
-      $value = json_decode($raw_value, true);
-      if(null === $value) {
-        Terminus::error(sprintf('Invalid JSON: %s', $raw_value));
-      }
-    } else {
-      $value = $raw_value;
+  static function getConfigurator() {
+    static $configurator;
+
+    if (!$configurator) {
+      $configurator = new Configurator(TERMINUS_ROOT . '/php/config-spec.php');
     }
 
-    return $value;
-  }
-
-  /**
-   * Display a value, in various formats
-   * TODO: Create and use outputter for this
-   *
-   * @param mixed $value
-   * @param array $assoc_args
-   */
-  static function print_value($value, $assoc_args = array()) {
-    if(isset($assoc_args['format']) && 'json' == $assoc_args['format']) {
-      $value = json_encode($value);
-    } elseif(is_array($value) || is_object($value)) {
-      $value = var_export($value);
-    }
-
-    echo $value . "\n";
-  }
-
-  /**
-   * Convert a error into a string
-   *
-   * @param mixed $errors
-   * @return string
-   */
-  static function error_to_string($errors) {
-    if(is_string($errors)) {
-      return $errors;
-    }
-
-    if(is_object($errors) && is_a($errors, 'WP_Error')) {
-      foreach($errors->get_error_messages() as $message) {
-        if($errors->get_error_data())
-          return $message . ' ' . $errors->get_error_data();
-        else
-          return $message;
-      }
-    }
-  }
-
-  /**
-   * Launch an external process that takes over I/O.
-   *
-   * @param string Command to call
-   * @param bool Whether to exit if the command returns an error status
-   *
-   * @return int The command exit status
-   */
-  static function launch($command, $exit_on_error = true) {
-    $r = proc_close(proc_open($command, array(STDIN, STDOUT, STDERR), $pipes));
-
-    if($r && $exit_on_error)
-      exit($r);
-
-    return $r;
-  }
-
-  /**
-   * Launch another Terminus command using the runtime arguments for the current process
-   *
-   * @param string Command to call
-   * @param array $args Positional arguments to use
-   * @param array $assoc_args Associative arguments to use
-   * @param bool Whether to exit if the command returns an error status
-   *
-   * @return int The command exit status
-   */
-  static function launch_self($command, $args = array(), $assoc_args = array(), $exit_on_error = true) {
-    $reused_runtime_args = array(
-      'path',
-      'url',
-      'user',
-      'allow-root',
-   );
-
-    foreach($reused_runtime_args as $key) {
-      if(array_key_exists($key, self::get_runner()->config))
-        $assoc_args[ $key ] = self::get_runner()->config[$key];
-    }
-
-    $php_bin = self::get_php_binary();
-
-    if(Terminus::is_test()) {
-      $script_path = __DIR__.'/boot-fs.php';
-    } else {
-      $script_path = $GLOBALS['argv'][0];
-    }
-
-    $args = implode(' ', array_map('escapeshellarg', $args));
-    $assoc_args = \Terminus\Utils\assoc_args_to_str($assoc_args);
-
-    $full_command = "{$php_bin} {$script_path} {$command} {$args} {$assoc_args}";
-
-    return self::launch($full_command, $exit_on_error);
-  }
-
-  private static function get_php_binary() {
-    if(defined('PHP_BINARY'))
-      return PHP_BINARY;
-
-    if(getenv('TERMINUS_PHP_USED'))
-      return getenv('TERMINUS_PHP_USED');
-
-    if(getenv('TERMINUS_PHP'))
-      return getenv('TERMINUS_PHP');
-
-    return 'php';
-  }
-
-  static function get_config($key = null) {
-    if(null === $key) {
-      return self::get_runner()->config;
-    }
-
-    if(!isset(self::get_runner()->config[ $key ])) {
-      self::warning("Unknown config option '$key'.");
-      return null;
-    }
-
-    return self::get_runner()->config[ $key ];
-  }
-
-  static function set_config($key, $value) {
-    self::get_runner()->config[ $key ] = $value;
-    return self::get_runner()->config;
-  }
-
-  /**
-   * @deprecated
-   */
-  static function menu($data, $default = null, $text = "Select one", $return_value=false) {
-    echo PHP_EOL;
-    $index = \cli\Streams::menu($data,$default,$text);
-    if($return_value) {
-      return $data[$index];
-    }
-    return $index;
-  }
-
-  /**
-   * Run a given command.
-   *
-   * @param array
-   * @param array
-   */
-  static function run_command($args, $assoc_args = array()) {
-    self::get_runner()->run_command($args, $assoc_args);
-  }
-
-  /**
-   * Terminus is in test mode
-   */
-  static function is_test() {
-    if(defined('CLI_TEST_MODE') && (CLI_TEST_MODE !== false)) {
-      return true;
-    }
-    $is_test = (boolean)getenv("CLI_TEST_MODE");
-    return $is_test;
-  }
-
-  /**
-   * Set the outputter instance.
-   *
-   * @param [object] $outputter
-   * @return [void]
-   */
-  static function set_outputter($outputter) {
-    self::$outputter = $outputter;
+    return $configurator;
   }
 
   /**
    * Retrieves the instantiated logger
    *
-   * @return [KLogger] $logger
+   * @return [LoggerInterface] $logger
    */
-  public static function get_logger() {
+  static function getLogger() {
     return self::$logger;
   }
 
   /**
    * Retrieves the instantiated outputter
    *
-   * @return [Logger] $outputter
+   * @return [OutputterInterface] $outputter
    */
-  public static function get_outputter() {
+  static function getOutputter() {
     return self::$outputter;
+  }
+
+  /**
+   * Returns location of PHP with which to run Terminus
+   *
+   * @return [string] $php_bin
+   */
+  private static function getPhpBinary() {
+    if (defined('PHP_BINARY')) {
+      $php_bin = PHP_BINARY;
+    } elseif (getenv('TERMINUS_PHP_USED')) {
+      $php_bin = getenv('TERMINUS_PHP_USED');
+    } elseif (getenv('TERMINUS_PHP')) {
+      $php_bin = getenv('TERMINUS_PHP');
+    } else {
+      $php_bin = 'php';
+    }
+    return $php_bin;
+  }
+
+  /**
+   * Retrieves the root command from the Dispatcher
+   *
+   * @return [string] $root
+   */
+  static function getRootCommand() {
+    static $root;
+
+    if (!$root) {
+      $root = new Dispatcher\RootCommand;
+    }
+
+    return $root;
+  }
+
+  /**
+   * Retrieves the runner, creating it if DNE
+   *
+   * @return [Runner] $runner
+   */
+  static function getRunner() {
+    try {
+      static $runner;
+
+      if (!isset($runner) || !$runner) {
+        $runner = new Runner();
+      }
+
+      return $runner;
+    } catch (\Exception $e) {
+      throw new TerminusException($e->getMessage(), array(), -1);
+    }
+  }
+
+  /**
+   * Terminus is in test mode
+   *
+   * @return [boolean]
+   */
+  static function isTest() {
+    $is_test = (boolean)getenv('CLI_TEST_MODE');
+    return $is_test;
+  }
+
+  /**
+   * Launch an external process that takes over I/O.
+   *
+   * @param [string]  $command       Command to call
+   * @param [boolean] $exit_on_error True to exit if the command returns error
+   * @return [integer] $status The command exit status
+   */
+  static function launch($command, $exit_on_error = true) {
+    if (Utils\isWindows()) {
+      $command = '"' . $command . '"';
+    }
+    $r = proc_close(proc_open($command, array(STDIN, STDOUT, STDERR), $pipes));
+
+    if ($r && $exit_on_error) {
+      exit($r);
+    }
+
+    return $r;
+  }
+
+  /**
+   * Launch another Terminus command using the runtime arguments for the
+   * current process
+   *
+   * @param [string]  $command       Command to call
+   * @param [array]   $args          Positional arguments to use
+   * @param [array]   $assoc_args    Associative arguments to use
+   * @param [boolean] $exit_on_error True to exit if the command returns error
+   * @return [integer] $status The command exit status
+   */
+  static function launchSelf(
+    $command,
+    $args = array(),
+    $assoc_args = array(),
+    $exit_on_error = true
+  ) {
+    $reused_runtime_args = array(
+      'path',
+      'url',
+      'user',
+      'allow-root',
+    );
+
+    foreach ($reused_runtime_args as $key) {
+      if (array_key_exists($key, self::getRunner()->config)) {
+        $assoc_args[$key] = self::getRunner()->config[$key];
+      }
+    }
+    if (Terminus::isTest()) {
+      $script_path = __DIR__.'/boot-fs.php';
+    } else {
+      $script_path = $GLOBALS['argv'][0];
+    }
+
+    $php_bin      = '"' . self::getPhpBinary() . '"' ;
+    $script_path  = '"' . $script_path . '"';
+    $escaped_args = array_map('escapeshellarg', $args);
+    $args         = implode(' ', $escaped_args);
+    $assoc_args   = Utils\assocArgsToStr($assoc_args);
+    $full_command = "$php_bin $script_path $command $args $assoc_args";
+    $status       = self::launch($full_command, $exit_on_error);
+    return $status;
+  }
+
+  /**
+   * Display a message in the CLI and end with a newline
+   * TODO: Clean this up. There should be no direct access to STDOUT/STDERR
+   *
+   * @param [string] $message Message to output before the new line
+   * @return [void]
+   */
+  static function line($message = '') {
+    fwrite(STDERR, $message . PHP_EOL);
+  }
+
+  /**
+   * Offers a menu to user and returns selection
+   *
+   * @param [array]   $data         Menu items
+   * @param [mixed]   $default      Default menu selection
+   * @param [string]  $text         Prompt text for menu
+   * @param [boolean] $return_value True to return selected value, false for
+   *   list ordinal
+   * @return [string] $data[$index] or $index
+   */
+  static function menu(
+    $data,
+    $default = null,
+    $text = 'Select one',
+    $return_value = false
+  ) {
+    echo PHP_EOL;
+    $index = \cli\Streams::menu($data, $default, $text);
+    if ($return_value) {
+      return $data[$index];
+    }
+    return $index;
+  }
+
+  /**
+   * Prompt the user for input
+   *
+   * @param [string] $message Message to give at prompt
+   * @param [mixed]  $default Returned if user does not select a valid option
+   * @return [string] $response
+   */
+  static function prompt($message = '', $default = null) {
+    if (!empty($params)) {
+      $message = vsprintf($message, $params);
+    }
+    $response = \cli\prompt($message);
+    if (empty($response) && $default) {
+      $response = $default;
+    }
+    return $response;
+  }
+
+  /**
+   * Gets input from STDIN silently
+   * By: Troels Knak-Nielsen
+   * From: http://www.sitepoint.com/interactive-cli-password-prompt-in-php/
+   *
+   * @param [string] $message Message to give at prompt
+   * @param [mixed]  $default Returned if user does not select a valid option
+   * @return [string] $response
+   */
+  static function promptSecret($message = '', $default = null) {
+    if (Utils\isWindows()) {
+      $vbscript = sys_get_temp_dir() . 'prompt_password.vbs';
+      file_put_contents(
+        $vbscript, 'wscript.echo(InputBox("'
+        . addslashes($message)
+        . '", "", "password here"))'
+      );
+      $command  = "cscript //nologo " . escapeshellarg($vbscript);
+      $response = rtrim(shell_exec($command));
+      unlink($vbscript);
+    } else {
+      $command = "/usr/bin/env bash -c 'echo OK'";
+      if (rtrim(shell_exec($command)) !== 'OK') {
+        trigger_error("Can't invoke bash");
+        return;
+      }
+      $command  = "/usr/bin/env bash -c 'read -s -p \""
+        . addslashes($message)
+        . "\" mypassword && echo \$mypassword'";
+      $response = rtrim(shell_exec($command));
+      echo "\n";
+    }
+    if (empty($response) && $default) {
+      $response = $default;
+    }
+    return $response;
+  }
+
+  /**
+   * Run a given command.
+   *
+   * @param [array] $args       An array of arguments for the runner
+   * @param [array] $assoc_args Another array of arguments for the runner
+   * @return [void]
+   */
+  static function runCommand($args, $assoc_args = array()) {
+    self::getRunner()->runCommand($args, $assoc_args);
+  }
+
+  /**
+   * Sets the runner config to a class property
+   *
+   * @param [string] $key   Key for the config element
+   * @param [mixed]  $value Value for config element
+   * @return [array] $config
+   */
+  static function setConfig($key, $value) {
+    self::getRunner()->config[$key] = $value;
+    $config = self::getRunner()->config;
+    return $config;
+  }
+
+  /**
+   * Set the logger instance to a class property
+   *
+   * @param [LoggerInterface] $logger Logger to set
+   * @return [void]
+   */
+  static function setLogger($logger) {
+    self::$logger = $logger;
+  }
+
+  /**
+   * Set the outputter instance to a class property
+   *
+   * @param [OutputterInterface] $outputter Outputter to set
+   * @return [void]
+   */
+  static function setOutputter($outputter) {
+    self::$outputter = $outputter;
   }
 
 }

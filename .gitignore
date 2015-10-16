@@ -5,7 +5,6 @@
 /builds
 
 .DS_Store
-*.swp
-*.swo
+*.sw*
 .env
 .idea

@@ -2,7 +2,7 @@
 
 namespace Terminus\Models;
 
-use \TerminusCommand;
+use TerminusCommand;
 
 abstract class TerminusModel {
   protected $id;
@@ -56,9 +56,9 @@ abstract class TerminusModel {
    * @return [TerminusModel] $this
    */
   public function fetch($paged = false) {
-    $function_name = 'simple_request';
+    $function_name = 'simpleRequest';
     if ($paged) {
-      $function_name = 'paged_request';
+      $function_name = 'pagedRequest';
     }
 
     $results = TerminusCommand::$function_name(

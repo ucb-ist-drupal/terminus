@@ -1,8 +1,10 @@
 <?php
+
 namespace Terminus;
 
+use Terminus;
 use Guzzle\Http\Client as Browser;
-use \Terminus\Loggers\Regular;
+
 /**
  * Handles requests made by terminus
  *
@@ -36,9 +38,7 @@ class Request {
     }
     if (isset($data['body']) && $data['body']) {
       $options['body'] = $data['body'];
-      if (\Terminus::get_config('debug')) {
-        \Terminus\Loggers\Regular::debug($data['body']);
-      }
+      Terminus::getLogger()->debug($data['body']);
     }
 
     $request = $browser->createRequest($method, $url, null, null, $options );
@@ -61,12 +61,13 @@ class Request {
       }
     }
 
-    if (\Terminus::get_config("debug")) {
+    if (Terminus::getConfig("debug")) {
       $debug = "#### REQUEST ####".PHP_EOL;
       $debug .= $request->getRawHeaders();
-      \Terminus\Loggers\Regular::debug($debug);
-      if (isset($data['body']))
-        \Terminus\Loggers\Regular::debug($data['body']);
+      Terminus::getLogger()->debug($debug);
+      if (isset($data['body'])) {
+        Terminus::getLogger()->debug($data['body']);
+      }
     }
 
     $response = $request->send();

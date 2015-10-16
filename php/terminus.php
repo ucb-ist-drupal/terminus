@@ -2,7 +2,7 @@
 
 //Can be used by plugins/themes to check if Terminus is running or not
 define('Terminus', true);
-define('TERMINUS_VERSION', '0.8.0');
+define('TERMINUS_VERSION', '0.8.1');
 
 $source = 'unknown';
 if ((PHP_SAPI == 'cli') && isset($argv)) {
@@ -18,7 +18,7 @@ include TERMINUS_ROOT . '/php/dispatcher.php';
 include TERMINUS_ROOT . '/php/class-terminus.php';
 include TERMINUS_ROOT . '/php/class-terminus-command.php';
 
-\Terminus\Utils\load_dependencies();
+\Terminus\Utils\loadDependencies();
 
 //Load environment variables from __DIR__/.env
 if (file_exists(getcwd() . '/.env')) {
@@ -27,7 +27,7 @@ if (file_exists(getcwd() . '/.env')) {
 }
 
 //Set a custom exception handler
-set_exception_handler('\Terminus\Utils\handle_exception');
+//set_exception_handler('\Terminus\Utils\handle_exception');
 
 if (isset($_SERVER['TERMINUS_HOST']) && ($_SERVER['TERMINUS_HOST'] != '')) {
   define('TERMINUS_HOST', $_SERVER['TERMINUS_HOST']);
@@ -44,7 +44,7 @@ if (isset($_SERVER['VCR_CASSETTE'])) {
   \VCR\VCR::insertCassette($_SERVER['VCR_CASSETTE']);
 }
 
-Terminus::get_runner()->run();
+Terminus::getRunner()->run();
 
 if (isset($_SERVER['VCR_CASSETTE'])) {
   \VCR\VCR::eject();

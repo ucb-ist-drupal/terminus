@@ -1,8 +1,6 @@
 <?php
 
-use \Terminus\Dispatcher;
-use \Terminus\Utils;
-use \Terminus\SitesCache;
+use Terminus\SitesCache;
 use Terminus\Models\Site;
 use Terminus\Models\User;
 
@@ -38,8 +36,8 @@ class CLI_Command extends TerminusCommand {
    * Print Terminus version.
    */
   function version() {
-    $labels = ['version' => 'Terminus version', 'script' => 'Terminus script'];
-    $this->outputter->outputRecord(['version' => TERMINUS_VERSION, 'script' => TERMINUS_SCRIPT], $labels);
+    $labels = array('version' => 'Terminus version', 'script' => 'Terminus script');
+    $this->output()->outputRecord(array('version' => TERMINUS_VERSION, 'script' => TERMINUS_SCRIPT), $labels);
   }
 
   /**
@@ -53,7 +51,7 @@ class CLI_Command extends TerminusCommand {
   function info( $_, $assoc_args ) {
     $php_bin = defined( 'PHP_BINARY' ) ? PHP_BINARY : getenv( 'TERMINUS_PHP_USED' );
 
-    $runner = Terminus::get_runner();
+    $runner = Terminus::getRunner();
 
     $info = array(
       'php_binary_path' => $php_bin,
@@ -64,7 +62,7 @@ class CLI_Command extends TerminusCommand {
       'wp_cli_dir_path' => TERMINUS_ROOT,
       'wp_cli_version' => TERMINUS_VERSION,
     );
-    $labels = [
+    $labels = array(
       'php_binary_path' => 'PHP binary',
       'php_version' => 'PHP version',
       'php_ini' => 'php.ini used',
@@ -72,8 +70,8 @@ class CLI_Command extends TerminusCommand {
       'project_config_path' => 'Terminus project config',
       'wp_cli_dir_path' => 'Terminus root dir',
       'wp_cli_version' => 'Terminus version',
-    ];
-    $this->outputter->outputRecord($info, $labels);
+    );
+    $this->output()->outputRecord($info, $labels);
 
   }
 
@@ -83,7 +81,7 @@ class CLI_Command extends TerminusCommand {
    * @subcommand param-dump
    */
   function param_dump() {
-    $this->outputter->outputDump(\Terminus::get_configurator()->get_spec());
+    $this->output()->outputDump(\Terminus::getConfigurator()->get_spec());
   }
 
   /**
@@ -92,7 +90,7 @@ class CLI_Command extends TerminusCommand {
    * @subcommand cmd-dump
    */
   function cmd_dump() {
-    $this->outputter->outputDump(self::command_to_array( Terminus::get_root_command() ));
+    $this->output()->outputDump(self::command_to_array( Terminus::getRootCommand() ));
   }
 
   /**
@@ -126,7 +124,7 @@ class CLI_Command extends TerminusCommand {
   */
   public function session_dump() {
     $session = $this->cache->get_data("session");
-    $this->outputter->outputDump($session);
+    $this->output()->outputDump($session);
   }
 
   /**
@@ -158,7 +156,7 @@ class CLI_Command extends TerminusCommand {
   * @subcommand console
   */
   public function console($args, $assoc_args) {
-    $user = new User(new stdClass(), array());
+    $user = new User();
     if (isset($assoc_args['site'])) {
       $sitename = $assoc_args['site'];
       $site_id = $this->sitesCache->findID($sitename);
@@ -169,4 +167,4 @@ class CLI_Command extends TerminusCommand {
   }
 }
 
-Terminus::add_command('cli', 'CLI_Command');
+Terminus::addCommand('cli', 'CLI_Command');
