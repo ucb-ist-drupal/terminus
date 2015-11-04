@@ -3,12 +3,45 @@ All notable changes to this project starting with the 0.6.0 release will be docu
 
 ##Master
 ### Added
+- `site environments` now includes data on whether environment is initialized yet. (#654)
+
+### Changed
+- Cached sites lists are now keyed to UUID, preventing a previously logged-in user's list from interfering with the currently logged-in user. (#652)
+
+### Fixed
+- Automatic version check disabled for testing. (#643)
+- Bad Github API returns for version check now does not cause error. (#643)
+
+##[0.9.2] - 2015-10-29
+### Fixed
+- `sites list` no longer capitalizes membership UUIDs. (#642)
+
+### Added
+- `sites list` now has an optional `--cached` flag which makes the command return the cached sites data rather than retrieving it anew. (#637)
+- `sites mass-update` now can be filtered by `--tag=<tag>`. (Note: `--org=<name|id>` is necessary to use the filter.) (#640)
+- `sites mass-update` now has an optional `--cached` tag to optionally prevent retrieving a new sites cache. (#640)
+- Environment variables `TERMINUS_PORT` and `TERMINUS_PROTOCOL` now enabled. (#643)
+
+##[0.9.1] - 2015-10-27
+### Fixed
+- `site backups get` will now find and retrieve backups properly. (#632)
+- `sites mass-update` now differentiates between an updated site and one in SFTP mode and warns user appropriately. (#633)
+
+##[0.9.0] - 2015-10-22
+### Added
 - `site environment-info --site=<site> --env=<env> [--field=<field>]` (#582)
+- `site backups get` now has an optional `--file=<filename>` parameter for selection. (#604)
 
 ### Fixed
 - `site connection-info` Git, MySQL and Redis info now correct (#573)
 - Password no longer shows when logging in with some Windows terminal clients (#574)
 - No more errors when running Terminus in Windows from directories with spaces in the path. (#575)
+- User-type workflows, as used while waiting on `sites create`, now retrieve UUID properly. (#588)
+- `site create-env` no longer fails to clone from an environment. (#602)
+- `site backups list` filtering by element fixed. (#602)
+- Four SSH-based commands now return with unavailable errors: `wp import`, `wp db`, `drush sql-connect`, and `drush sql-sync`. (#607)
+- Failure of the API to return a connection mode no longer inhibits its setting. (#616)
+- When trying to access an invalid collection member, Terminus now exits instead of having a fatal error. (#615)
 
 ### Changed
 - Logged errors now exit with -1. (#576)
@@ -16,6 +49,7 @@ All notable changes to this project starting with the 0.6.0 release will be docu
 - `site connection-mode` no longer checks the connection mode. Connection-mode checks are now done using `site environment-info --field=connection_mode` (#583)
 - `site connection-mode` is now `site set-connection-mode` and uses the `--mode` flag instead of `--set`. (#583)
 - `site import` is now `site import-content` and the --element parameter only accepts "files" and "database" (#516)
+- Command failures now have an exit code of "1". (#605)
 
 ### Removed
 - Removed `site attributes`. Use `site info` for the same effect. (#584)

@@ -1,11 +1,24 @@
 <?php
 
 use Terminus\CommandWithSSH;
-use Terminus\Exceptions\TerminusException;
 use Terminus\Helpers\Input;
 use Terminus\Models\Collections\Sites;
 
 class WPCLI_Command extends CommandWithSSH {
+  /**
+   * Name of client that command will be run on server via
+   */
+  protected $client = 'WP-CLI';
+
+  /**
+   * A hash of commands which do not work in Terminus
+   * The key is the drush command
+   * The value is the Terminus equivalent, blank if DNE
+   */
+  protected $unavailable_commands = array(
+    'import' => '',
+    'db'     => '',
+  );
 
   /**
    * Invoke `wp` commands on a Pantheon development site
@@ -24,11 +37,13 @@ class WPCLI_Command extends CommandWithSSH {
    *
    */
   function __invoke( $args, $assoc_args ) {
+    $command = implode( $args, ' ' );
+    $this->checkCommand($command);
+    $sites       = new Sites();
+    $site        = $sites->get(Input::sitename($assoc_args));
     $environment = Input::env($assoc_args);
-    $sites = new Sites();
-    $site = $sites->get(Input::sitename($assoc_args));
     if (!$site) {
-      throw new TerminusException("Command could not be completed. Unknown site specified.");
+      $this->failure('Command could not be completed. Unknown site specified.');
     }
 
     # see https://github.com/pantheon-systems/titan-mt/blob/master/dashboardng/app/workshops/site/models/environment.coffee
@@ -50,7 +65,6 @@ class WPCLI_Command extends CommandWithSSH {
       unset($assoc_args['env']);
     }
     # Create user-friendly output
-    $command = implode( $args, ' ' );
     $flags = '';
     foreach ( $assoc_args as $k => $v ) {
       if (isset($v) && (string) $v != '') {
@@ -69,7 +83,7 @@ class WPCLI_Command extends CommandWithSSH {
         'env' => $environment
       )
     );
-    $result = $this->send_command($server, 'wp', $args, $assoc_args);
+    $result = $this->sendCommand($server, 'wp', $args, $assoc_args);
     if (Terminus::getConfig('format') != 'normal') {
       $this->output()->outputRecordList($result);
     }

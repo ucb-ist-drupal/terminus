@@ -2,8 +2,8 @@
 
 use Terminus\Utils;
 use Terminus\Helpers\Input;
-use Terminus\Models\User;
 use Terminus\Exceptions\TerminusException;
+use Terminus\Models\User;
 use Terminus\Models\Collections\Sites;
 
 /**
@@ -149,7 +149,7 @@ public function code($args, $assoc_args) {
   */
 public function set_connection_mode($args, $assoc_args) {
   if (!isset($assoc_args['mode']) || !in_array($assoc_args['mode'], array('sftp', 'git'))) {
-    throw new TerminusException('You must specify the mode as either sftp or git.');
+    $this->failure('You must specify the mode as either sftp or git.');
   }
   $mode = strtolower($assoc_args['mode']);
   $site = $this->sites->get(Input::sitename($assoc_args));
@@ -160,17 +160,24 @@ public function set_connection_mode($args, $assoc_args) {
     Input::env($assoc_args, 'env', 'Choose environment', $environments)
   );
   if (in_array($env->get('id'), array('test', 'live'))) {
-    throw new TerminusException('Connection mode cannot be set in Test or Live environments');
+    $this->failure('Connection mode cannot be set in Test or Live environments');
   }
-  if ($mode == $env->info('connection_mode')) {
-    throw new TerminusException(
-      'The connection mode on {site} for {env} is already set to {mode}.',
-      array(
-        'site' => $site->get('name'),
-        'env' => $env->get('id'),
-        'mode' => $mode
-      ),
-      -1
+  try {
+    $current_mode = $env->info('connection_mode');
+    if ($current_mode == $env->info('connection_mode')) {
+      $this->failure(
+        'The connection mode on {site} for {env} is already set to {mode}.',
+        array(
+          'site' => $site->get('name'),
+          'env' => $env->get('id'),
+          'mode' => $mode
+        ),
+        -1
+      );
+    }
+  } catch (TerminusException $e) {
+    $this->log()->info(
+      'Current connection info not available. Proceeding with mode change.'
     );
   }
   $workflow = $env->changeConnectionMode($mode);
@@ -380,7 +387,7 @@ public function organizations($args, $assoc_args) {
       $role = Input::optional('role', $assoc_args, 'team_member');
       $org  = Input::orgname($assoc_args, 'org');
       if (!$this->isOrgAccessible($org)) {
-        throw new TerminusException(
+        $this->failure(
           "Organization is either invalid or you are not a member."
         );
       }
@@ -390,13 +397,13 @@ public function organizations($args, $assoc_args) {
     case 'remove':
       $org = Input::orgid($assoc_args, 'org');
       if (!$this->isOrgAccessible($org)) {
-        throw new TerminusException(
+        $this->failure(
           "Organization is either invalid or you are not a member."
         );
       }
       $member   = $site->org_memberships->get($org);
       if ($member == null) {
-        throw new TerminusException('{org} is not a member of {site}', array('org' => $org, 'site' => $site->get('name')));
+        $this->failure('{org} is not a member of {site}', array('org' => $org, 'site' => $site->get('name')));
       }
       $workflow = $member->removeMember('organization', $org);
       $workflow->wait();
@@ -440,10 +447,13 @@ public function organizations($args, $assoc_args) {
   * : Environment to load
   *
   * [--element=<code|files|db|all>]
-  * : Element to download or create. *all* only used for 'create'
+  * : Element to download or create. `all` is only used for 'create'
   *
   * [--to=<directory|file>]
   * : Absolute path of a directory or filename to save the downloaded backup to
+  *
+  * [--file=<filename>]
+  * : Select one of the files from the list subcommand. Only used for 'get'
   *
   * [--latest]
   * : If set the latest backup will be selected automatically
@@ -457,7 +467,7 @@ public function organizations($args, $assoc_args) {
 public function backups($args, $assoc_args) {
   $action = array_shift($args);
   $site   = $this->sites->get(Input::sitename($assoc_args));
-  $env    = Input::env($assoc_args, 'env');
+  $env    = $site->environments->get(Input::env($assoc_args, 'env'));
   //Backward compatability supports "database" as a valid element value.
   if(
     isset($assoc_args['element'])
@@ -468,73 +478,37 @@ public function backups($args, $assoc_args) {
 
   switch ($action) {
     case 'get':
-      if (isset($assoc_args['element'])) {
-        $element = $assoc_args['element'];
+      $file = Input::optional('file', $assoc_args, false);
+      if ($file) {
+        $backup = $env->getBackupByFile($file);
+        $element = $backup->element;
       } else {
-        $element = Terminus::menu(
-          array('code', 'files', 'db'),
-          null,
-          'Select backup element',
-          true
-        );
-      }
+        $element = Input::backupElement(array('args' => $assoc_args));
+        $latest  = (boolean)Input::optional('latest', $assoc_args, false);
+        $backups = $env->getFinishedBackups($element);
 
-      if (!in_array($element,array('code', 'files', 'db'))) {
-        throw new TerminusException('Invalid backup element specified.');
-      }
-      $latest  = Input::optional('latest', $assoc_args, false);
-      $backups = $site->environments->get($env)->backups($element);
-
-      //Ensure that that backups being presented for retrieval have finished
-      $backups = array_filter($backups, function($backup) {
-        return (isset($backup->finish_time) && $backup->finish_time);
-      });
-
-      if ($latest) {
-        $backups = array(array_pop($backups));
-      }
-
-      $menu = $folders = array();
-
-      foreach($backups as $folder => $backup) {
-        if (!isset($backup->filename)) {
-          continue;
+        if ($latest) {
+          $backup = array_pop($backups);
+        } else {
+          $context = array('site' => $site->get('name'), 'env' => $env->get('id'));
+          $backup = Input::backup(array('backups' => $backups, 'context' => $context));
         }
-        if (!isset($backup->folder)) {
-          $backup->folder = $folder;
-        }
-        $buckets[] = $backup->folder;
-        $menu[]    = $backup->filename;
       }
 
-      if (empty($menu)) {
-        throw new TerminusException(
-          'No backups available. Create one with `terminus site backup create --site={site} --env={env}`',
-          array('site' => $site->get('name'), 'env' => $env)
-        );
-      }
-
-      $index = 0;
-      if (!$latest) {
-        $index = Terminus::menu($menu, null, 'Select backup');
-      }
-      $bucket   = $buckets[$index];
-      $filename = $menu[$index];
-
-      $url = $site->environments->get($env)->backupUrl($bucket, $element);
+      $url = $env->getBackupUrl($backup->folder, $element);
 
       if (isset($assoc_args['to'])) {
-        $target = $assoc_args['to'];
+        $target = str_replace('~', $_SERVER['HOME'], $assoc_args['to']);
         if (is_dir($target)) {
           $filename = Utils\getFilenameFromUrl($url->url);
           $target = sprintf('%s/%s', $target, $filename);
         }
         $this->log()->info('Downloading ... please wait ...');
         if ($this->download($url->url, $target)) {
-          $this->log()->info('Downloaded {target}', array('target' => $target));
+          $this->log()->info('Downloaded {target}', compact('target'));
           return $target;
         } else {
-          throw new TerminusException('Could not download file');
+          $this->failure('Could not download file');
         }
       }
       $this->output()->outputValue($url->url, 'Backup URL');
@@ -561,15 +535,15 @@ public function backups($args, $assoc_args) {
 
       exec('mysql -e "show databases"', $stdout, $exit);
       if ($exit != 0) {
-        throw new TerminusException('MySQL does not appear to be installed on your server.');
+        $this->failure('MySQL does not appear to be installed on your server.');
       }
 
-      $assoc_args['env'] = $env;
+      $assoc_args['env'] = $env->get('id');
       $target = $this->backup(array('get'), $assoc_args);
       $target = '/tmp/' . Utils\getFilenameFromUrl($target);
 
       if (!file_exists($target)) {
-        throw new TerminusException('Cannot read database file {target}', array('target' => $target));
+        $this->failure('Cannot read database file {target}', array('target' => $target));
       }
 
       $this->log()->info('Unziping database');
@@ -580,7 +554,7 @@ public function backups($args, $assoc_args) {
       $target = escapeshellarg($target);
       exec("mysql $database -u $username -p'$password' < $target", $stdout, $exit);
       if ($exit != 0) {
-        throw new TerminusException('Could not import database');
+        $this->failure('Could not import database');
       }
 
       $this->log()->info('{target} successfully imported to {db}', array('target' => $target, 'db' => $database));
@@ -591,13 +565,13 @@ public function backups($args, $assoc_args) {
         $options = array('code', 'db', 'files', 'all');
         $assoc_args['element'] = $options[Input::menu($options, 'all', 'Select element')];
       }
-      $workflow = $site->environments->get($env)->createBackup($assoc_args);
+      $workflow = $env->createBackup($assoc_args);
       $workflow->wait();
       $this->workflowOutput($workflow);
       break;
     case 'list':
     default:
-      $backups = $site->environments->get($env)->backups();
+      $backups = $env->getBackups();
       $element_name = false;
       if (isset($assoc_args['element']) && ($assoc_args['element'] != 'all')) {
         $element_name =  $assoc_args['element'];
@@ -612,7 +586,7 @@ public function backups($args, $assoc_args) {
           !isset($backup->filename)
           || (
             $element_name 
-            && !preg_match(sprintf('/backup_%s/', $element_name), $id)
+            && !preg_match(sprintf('/_%s/', $element_name), $id)
           )
         ) {
           continue;
@@ -623,7 +597,10 @@ public function backups($args, $assoc_args) {
           $date = date('Y-m-d H:i:s', $backup->finish_time);
         }
 
-        $size = $backup->size / 1048576;
+        $size = 0;
+        if (isset($backup->size)) {
+          $size = $backup->size / 1048576;
+        }
         if ($size > 0.1) {
           $size = sprintf('%.1fMB', $size);
         } elseif ($size > 0) {
@@ -746,7 +723,7 @@ public function clone_content($args, $assoc_args) {
   Terminus::confirm($confirm);
 
   if ($site->environments->get($to_env) == null) {
-    throw new TerminusException('The {env} environment was not found.', array('env' => $to_env));
+    $this->failure('The {env} environment was not found.', array('env' => $to_env));
   }
 
   if ($db) {
@@ -787,12 +764,12 @@ public function create_env($args, $assoc_args) {
 
   if ((boolean)$site->getFeature('multidev')) {
     if (isset($assoc_args['to-env'])) {
-      $env_id = $assoc_args['to-env'];
+      $to_env_id = $assoc_args['to-env'];
     } else {
-      $env_id = Terminus::prompt('Name of new multidev environment');
+      $to_env_id = Terminus::prompt('Name of new multidev environment');
     }
 
-    $src = $site->environments->get(
+    $from_env = $site->environments->get(
       Input::env(
         $assoc_args,
         'from-env',
@@ -801,11 +778,11 @@ public function create_env($args, $assoc_args) {
       )
     );
 
-    $workflow = $site->environments->create($env_id);
+    $workflow = $site->environments->create($to_env_id, $from_env);
     $workflow->wait();
     $this->workflowOutput($workflow);
   } else {
-    throw new TerminusException(
+    $this->failure(
       'This site does not have the authority to conduct this operation.'
     );
   }
@@ -991,7 +968,7 @@ public function deploy($args, $assoc_args) {
   ));
 
   if (!$env || !in_array($env->get('id'), array('test', 'live'))) {
-    throw new TerminusException('You can only deploy to the test or live environment.');
+    $this->failure('You can only deploy to the test or live environment.');
   }
 
   $sync_content = ($env->get('id') == 'test' && isset($assoc_args['sync-content']));
@@ -1039,7 +1016,7 @@ public function environments($args, $assoc_args) {
 
   $data = array();
   foreach ($environments as $name => $env) {
-    $osd  = $locked = 'false';
+    $osd  = $locked = $initialized ='false';
     $lock = $env->get('lock');
     if ((boolean)$lock->locked) {
       $locked = 'true';
@@ -1047,16 +1024,20 @@ public function environments($args, $assoc_args) {
     if ((boolean)$env->get('on_server_development')) {
       $osd = 'true';
     }
+    if ((boolean)$env->isInitialized()) {
+      $initialized = 'true';
+    }
 
     $data[] = array(
-      'name'          => $env->get('id'),
-      'created'       => date('Y-m-dTH:i:s', $env->get('environment_created')),
-      'domain'        => $env->domain(),
-      'onserverdev'   => $osd,
-      'locked'        => $locked,
+      'name'        => $env->get('id'),
+      'created'     => date('Y-m-dTH:i:s', $env->get('environment_created')),
+      'domain'      => $env->domain(),
+      'onserverdev' => $osd,
+      'locked'      => $locked,
+      'initialized' => $initialized,
     );
   }
-  $this->output()->outputRecordList($data, array('name' => 'Name', 'created' => 'Created', 'domain' => 'Domain', 'onserverdev' => 'OnServer Dev?', 'locked' => 'Locked?'));
+  $this->output()->outputRecordList($data, array('name' => 'Name', 'created' => 'Created', 'domain' => 'Domain', 'onserverdev' => 'OnServer Dev?', 'locked' => 'Locked?', 'initialized' => 'Initialized?'));
   return $data;
 }
 
@@ -1100,7 +1081,7 @@ public function environments($args, $assoc_args) {
       break;
       case 'add':
         if (!isset($assoc_args['hostname'])) {
-          throw new TerminusException('Must specify hostname with --hostname');
+          $this->failure('Must specify hostname with --hostname');
         }
         $data = $env->addHostname($assoc_args['hostname']);
         $this->log()->debug(json_encode($data));
@@ -1111,7 +1092,7 @@ public function environments($args, $assoc_args) {
         break;
       case 'remove':
         if (!isset($assoc_args['hostname'])) {
-          throw new TerminusException('Must specify hostname with --hostname');
+          $this->failure('Must specify hostname with --hostname');
         }
         $data = $env->deleteHostname($assoc_args['hostname']);
         $this->log()->info(
@@ -1273,7 +1254,7 @@ public function set_instrument($args, $assoc_args) {
     !isset($instruments[$instrument_id])
     && !in_array($instrument_id, Input::$NULL_INPUTS)
   ) {
-    throw new TerminusException("You do not have permission to attach instrument $instrument_id");
+    $this->failure("You do not have permission to attach instrument $instrument_id");
   }
 
   $site = $this->sites->get(Input::sitename($assoc_args));
@@ -1304,7 +1285,7 @@ public function set_instrument($args, $assoc_args) {
 public function mount($args, $assoc_args) {
   exec('which sshfs', $stdout, $exit);
   if ($exit !== 0) {
-    throw new TerminusException('Must install sshfs first');
+    $this->failure('Must install sshfs first');
   }
 
   $destination = Utils\destinationIsValid($assoc_args['destination']);
@@ -1336,7 +1317,7 @@ public function mount($args, $assoc_args) {
   );
   exec($cmd, $stdout, $exit);
   if ($exit != 0) {
-    throw new TerminusException("Couldn't mount $destination");
+    $this->failure("Couldn't mount $destination");
   }
   $this->log()->info(
     'Site mounted to {destination}. To unmount, run: umount {destination} (or fusermount -u {destination}).',
@@ -1429,7 +1410,7 @@ public function redis($args, $assoc_args) {
     case 'clear':
       $bindings = $site->bindings('cacheserver');
       if (empty($bindings)) {
-        throw new TerminusException('Redis cache not enabled');
+        $this->failure('Redis cache not enabled');
       }
       $commands = array();
       foreach ($bindings as $binding) {
@@ -1518,13 +1499,13 @@ public function tags($args, $assoc_args) {
         if ($response['status_code'] == 200) {
           $this->log()->info('Tag "{tag}" has been added to {site}', $context);
         } else {
-          throw new TerminusException('Tag "{tag}" could not be added to {site}', $context);
+          $this->failure('Tag "{tag}" could not be added to {site}', $context);
         }
         break;
       case 'remove':
         $tags   = $site->getTags($org);
         if (count($tags) === 0) {
-          throw new TerminusException(
+          $this->failure(
             'This organization does not have any tags associated with this site.'
           );
         } elseif (
@@ -1544,7 +1525,7 @@ public function tags($args, $assoc_args) {
         if ($response['status_code'] == 200) {
           $this->log()->info('Tag "{tag}" has been removed from {site}', $context);
         } else {
-          throw new TerminusException('Tag "{tag}" could not be removed from {site}', $context);
+          $this->failure('Tag "{tag}" could not be removed from {site}', $context);
         }
 
         break;
@@ -1555,7 +1536,7 @@ public function tags($args, $assoc_args) {
         break;
     }
   } else {
-    throw new TerminusException(
+    $this->failure(
       '{site} is not a member of an organization, which is necessary to associate a tag with a site.',
       array('site' => $site->get('name'))
     );
@@ -1602,7 +1583,7 @@ public function team($args, $assoc_args) {
         $workflow = $user->removeMember($assoc_args['member']);
         $this->workflowOutput($workflow);
       } else {
-        throw new TerminusException(
+        $this->failure(
           '"{member}" is not a valid member.',
           array('member' => $assoc_args['member'])
         );
@@ -1616,13 +1597,13 @@ public function team($args, $assoc_args) {
           $workflow = $user->setRole($role);
           $this->workflowOutput($workflow);
         } else {
-          throw new TerminusException(
+          $this->failure(
             '"{member}" is not a valid member.',
             array('member' => $assoc_args['member'])
           );
         }
       } else {
-        throw new TerminusException(
+        $this->failure(
           'This site does not have the authority to conduct this operation.'
         );
       }
@@ -1731,7 +1712,7 @@ public function upstream_updates($args, $assoc_args) {
             $env = $assoc_args['env'];
           }
           if (in_array($env, array('test', 'live'))) {
-            throw new TerminusException(
+            $this->failure(
               'Upstream updates cannot be applied to the {env} environment',
               array('env' => $env)
             );
@@ -1779,10 +1760,10 @@ public function upstream_updates($args, $assoc_args) {
     $env  = Input::env($assoc_args, 'env');
     $data = $site->environments->get($env)->wake();
     if (!$data['success']) {
-      throw new TerminusException('Could not reach {target}', array('target' => $data['target']));
+      $this->failure('Could not reach {target}', array('target' => $data['target']));
     }
     if (!$data['styx']) {
-      throw new TerminusException('Pantheon headers missing, which is not quite right.');
+      $this->failure('Pantheon headers missing, which is not quite right.');
     }
 
     $this->log()->info(

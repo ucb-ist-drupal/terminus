@@ -2,7 +2,6 @@
 
 use Terminus\Dispatcher;
 use Terminus\Utils;
-use Terminus\Exceptions\TerminusException;
 
 class Help_Command extends TerminusCommand {
 
@@ -22,7 +21,7 @@ class Help_Command extends TerminusCommand {
    * @synopsis [<command>...]
    */
   function __invoke($args, $assoc_args) {
-    $command = self::find_subcommand($args);
+    $command = self::findSubcommand($args);
 
     if ($command) {
       $this->show_help($command);
@@ -31,15 +30,15 @@ class Help_Command extends TerminusCommand {
 
     // WordPress is already loaded, so there's no chance we'll find the command
     if (function_exists('add_filter')) {
-      throw new TerminusException("'{cmd}' is not a registered command.", array('cmd' => $args[0]));
+      $this->failure("'{cmd}' is not a registered command.", array('cmd' => $args[0]));
     }
   }
 
-  private static function find_subcommand($args) {
+  private static function findSubcommand($args) {
     $command = \Terminus::getRootCommand();
 
-    while (!empty($args) && $command && $command->can_have_subcommands()) {
-      $command = $command->find_subcommand($args);
+    while (!empty($args) && $command && $command->canHaveSubcommands()) {
+      $command = $command->findSubcommand($args);
     }
 
     return $command;
@@ -51,7 +50,7 @@ class Help_Command extends TerminusCommand {
   private function show_help($command) {
 
     $out = self::get_initial_markdown($command);
-    $longdesc = $command->get_longdesc();
+    $longdesc = $command->getLongdesc();
     if ($longdesc) {
       if (is_array($longdesc)) {
         $flag_list = array_pop($longdesc);
@@ -121,12 +120,12 @@ class Help_Command extends TerminusCommand {
 
     $binding = array(
       'name' => $name,
-      'shortdesc' => $command->get_shortdesc(),
+      'shortdesc' => $command->getShortdesc(),
    );
 
-    $binding['synopsis'] = wordwrap("$name " . $command->get_synopsis(), 79);
+    $binding['synopsis'] = wordwrap("$name " . $command->getSynopsis(), 79);
 
-    if ($command->can_have_subcommands()) {
+    if ($command->canHaveSubcommands()) {
       $binding['has-subcommands']['subcommands'] = self::render_subcommands($command);
     }
 
@@ -140,8 +139,8 @@ class Help_Command extends TerminusCommand {
 
   private static function render_subcommands($command) {
     $subcommands = array();
-    foreach ($command->get_subcommands() as $subcommand) {
-      $subcommands[$subcommand->get_name()] = $subcommand->get_shortdesc();
+    foreach ($command->getSubcommands() as $subcommand) {
+      $subcommands[$subcommand->getName()] = $subcommand->getShortdesc();
     }
 
     if (Terminus::getConfig('format') == 'json') {
