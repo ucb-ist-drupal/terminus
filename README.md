@@ -14,23 +14,30 @@ Installation
 ------------
 
 **Requirements:**
-- PHP version 5.3.2 or later
+- PHP version 5.5.0 or later
 - [PHP-CLI](http://www.php-cli.com/)
 - [PHP-CURL](http://php.net/manual/en/curl.setup.php)
 
 Once you have at least the requirements installed, you can install Terminus via Composer, cURL, or Git. Additionally, you may want to install the optional software below to enhance your use of Terminus:
 
 **Optional but recommended:**
-- [Drush](http://docs.drush.org/en/master/install/) (Required for all `drush` commands)
-- [WP-CLI](http://wp-cli.org/) (Required for all `wp` commands)
+- [Drush](http://docs.drush.org/en/master/install/) (Useful to run incompatible-with-Terminus Drush commands)
+- [WP-CLI](http://wp-cli.org/) (Useful to run incompatible-with-Terminus WP-CLI commands)
 - [Composer](https://getcomposer.org/doc/00-intro.md)
 - [Git](https://help.github.com/articles/set-up-git/)
+
+####Installing with Composer
+
+The fastest and easiest way to install Terminus is via Composer. Simply run this in your terminal client:
+```
+composer require pantheon-systems/cli
+```
 
 ####Installing with cURL
 
 Run this in this in your terminal client:
 ```bash
-curl https://github.com/pantheon-systems/cli/releases/download/0.9.2/terminus.phar -L -o /usr/local/bin/terminus && chmod +x /usr/local/bin/terminus
+curl https://github.com/pantheon-systems/cli/releases/download/0.9.3/terminus.phar -L -o /usr/local/bin/terminus && chmod +x /usr/local/bin/terminus
 ```
 
 To get started with Terminus, you must first authenticate:
@@ -43,7 +50,7 @@ Your dashboard password (input will not be shown)
 ```
 
 ####Installing with Git
-To install with Git and use Terminus HEAD, you should clone this repository and run Terminus directly. If you would like to contribute to the Terminus source, this is the way you should install it.
+To install with Git and use Terminus HEAD, you should clone this repository and run Terminus directly. If you would like to contribute to the Terminus source, this is the way you should install it. You will require Composer for this installation.
 
 1. Clone the repository. If you plan on contributing to the project, create a fork and clone the fork instead.
   ```bash
@@ -77,7 +84,7 @@ terminus
 
 Tab completion
 --------------
-Terminus also comes with a tab completion script for Bash. Just download [terminus-completion.bash](https://github.com/pantheon-systems/cli/blob/master/utils/terminus-completion.bash) and source it from ``~/.bash_profile`:
+Terminus also comes with a tab completion script for Bash. Just download [terminus-completion.bash](https://github.com/pantheon-systems/cli/blob/master/utils/terminus-completion.bash) and source it from `~/.bash_profile`:
 
 ```bash
 source /FULL/PATH/TO/terminus-completion.bash

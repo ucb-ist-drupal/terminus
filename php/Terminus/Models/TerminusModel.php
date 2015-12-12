@@ -2,10 +2,11 @@
 
 namespace Terminus\Models;
 
-use TerminusCommand;
+use Terminus\Request;
 
 abstract class TerminusModel {
   protected $id;
+  protected $request;
   private $attributes;
 
   /**
@@ -19,10 +20,14 @@ abstract class TerminusModel {
     if ($attributes == null) {
       $attributes = new \stdClass();
     }
+    if (isset($attributes->id)) {
+      $this->id = $attributes->id;
+    }
     foreach ($options as $var_name => $value) {
       $this->$var_name = $value;
     }
     $this->attributes = $attributes;
+    $this->request    = new Request();
   }
 
   /**
@@ -52,18 +57,24 @@ abstract class TerminusModel {
   /**
    * Fetches this object from Pantheon
    *
-   * @param [boolean] $paged True to use paginated API requests
+   * @param [array] $options Params to pass to url request
    * @return [TerminusModel] $this
    */
-  public function fetch($paged = false) {
-    $function_name = 'simpleRequest';
-    if ($paged) {
-      $function_name = 'pagedRequest';
+  public function fetch($options = array()) {
+    $fetch_args = array();
+    if (isset($options['fetch_args'])) {
+      $fetch_args = $options['fetch_args'];
     }
 
-    $results = TerminusCommand::$function_name(
+    $options = array_merge(
+      array('options' => array('method' => 'get')),
+      $this->getFetchArgs(),
+      $fetch_args
+    );
+
+    $results = $this->request->simpleRequest(
       $this->getFetchUrl(),
-      $this->getFetchArgs()
+      $options
     );
 
     $this->attributes = $results['data'];
@@ -77,10 +88,21 @@ abstract class TerminusModel {
    * @return [mixed] $this->attributes->$attribute
    */
   public function get($attribute) {
-    if (isset($this->attributes->$attribute)) {
+    if ($this->has($attribute)) {
       return $this->attributes->$attribute;
     }
     return null;
+  }
+
+  /**
+   * Checks whether the model has an attribute
+   *
+   * @param [string] $attribute Name of the attribute key
+   * @return [boolean] $isset whether the attribute is set
+   */
+  public function has($attribute) {
+    $isset = isset($this->attributes->$attribute);
+    return $isset;
   }
 
   /**

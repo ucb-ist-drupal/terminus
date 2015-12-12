@@ -3,14 +3,51 @@ All notable changes to this project starting with the 0.6.0 release will be docu
 
 ##Master
 ### Added
+- New command `workflows show` displays details about a workflow (#687)
+- Added back session token-based login. (#693)
+- Added initiator data (manual or automated) to `site backups list`. (#716)
+- New command `workflows watch` to stream workflow updates (#722)
+- New command `site backups get-schedule` shows the scheduled weekly backup day and daily backup time. (#723)
+- New command `site backups set-schedule` schedules the daily backup and weekly day. (#724)
+- New command `site backups cancel-schedule` cancels the regular backup schedule. (#725)
+- New command `organizations team` displays a member list of organizational members. (#726)
+- Added an owners file per the Owners Policy on the Chromium Project. (#727)
+- New subcommand `site hostnames lookup --hostname=<hostname>` to look up a site and environment by hostname. WARNING: May take a long time to run. (#729)
+- New flag `--recursive` on `help` command to show the full details of all subcommands. (#730)
+- Environment variable `TERMINUS_SSH_HOST` targets a specific host for `drush` and `wp` commands. (#737)
+
+### Fixed
+- `site backups get` no longer errs when there are no backups. (#690)
+- Interactive commands' environment menus now consistently include multidev environments, where applicable. (#701)
+- `site wake` (#710)
+- `sites create` and `sites import` no longer give warnings about missing $org_id variable. (#733)
+- `site backups list` now responds to the `--latest` flag. (#734)
+- Changed Backups#isBackupFinished to falsify if backup size is "0". (#734)
+- Fixed fatal error which appeared when using `sites aliases`. (#743)
+- Fixed missing-variable error when user has no sites while using `sites aliases`. (#743)
+
+### Changed
+- Extricated the request logic from TerminusCommand class and moved it to the Request class. (#704)
+- Replaced Mustache templates with Twig. (#730)
+
+##[0.9.3] - 2015-11-17
+### Added
 - `site environments` now includes data on whether environment is initialized yet. (#654)
+- Login with Auth0 via `auth login --machine-token=<Auth0 token>` is now available. (#665)
+- You can set a machine token via the environment variable TERMINUS_MACHINE_TOKEN. (#665)
 
 ### Changed
 - Cached sites lists are now keyed to UUID, preventing a previously logged-in user's list from interfering with the currently logged-in user. (#652)
+- Terminus now requires PHP version 5.5.0 or greater. (#661)
+- Upgraded behavioral testing to Behat 3.0.x. (#670)
+- `site workflows` command moved to `workflows list`. (#676)
+- Moved command files from `php/commands` to `php/Terminus/Commands` and standardized file names. (#682)
+- Added an assets directory, moved ASCII art out of ArtCommand and into assets. (#685)
 
 ### Fixed
 - Automatic version check disabled for testing. (#643)
 - Bad Github API returns for version check now does not cause error. (#643)
+- Composer installation does not return stability errors. (#661)
 
 ##[0.9.2] - 2015-10-29
 ### Fixed
@@ -127,7 +164,7 @@ All notable changes to this project starting with the 0.6.0 release will be docu
 
 ##[0.6.1] - 2015-08-11
 ### Fixed
-- `site deploy` will not overwrite the Live environment's content (#373) 
+- `site deploy` will not overwrite the Live environment's content (#373)
 
 ### Changed
 - `site deploy` has a `--clone-live-environment` flag for copying Live content into Test (#373)

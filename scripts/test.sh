@@ -9,10 +9,17 @@ fi
 
 for f in $( git diff-tree $TRAVIS_COMMIT --name-status -r | grep php | grep -v "^D" | awk '{print $2}') ; do php -l $f ; done
 
-# Run the unit tests
-vendor/bin/phpunit --debug
+./scripts/lint.sh
 
 # Run the functional tests
-behat_cmd="vendor/bin/behat -c=tests/config/behat.yml"
-if [ ! -z $1 ]; then behat_cmd+=" -p=$1"; fi
+behat_cmd="vendor/bin/behat -c=tests/config/behat.yml --suite="
+if [ ! -z $1 ]; then
+  behat_cmd+=$1
+else
+  behat_cmd+="default"
+fi
+if [ -z $2 ]; then
+  # Run the unit tests if we are not targeting a feature
+  vendor/bin/phpunit -c tests/config/phpunit.xml.dist --debug
+fi
 eval $behat_cmd

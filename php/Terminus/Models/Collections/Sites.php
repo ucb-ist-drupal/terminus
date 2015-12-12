@@ -63,9 +63,10 @@ class Sites extends TerminusCollection {
    * Adds site with given site ID to cache
    *
    * @param [string] $site_id UUID of site to add to cache
+   * @param [string] $org_id  UUID of org to which new site belongs
    * @return [Site] $site The newly created site object
    */
-  public function addSiteToCache($site_id) {
+  public function addSiteToCache($site_id, $org_id = null) {
     if (count($this->models) == 0) {
       $this->rebuildCache();
       $site = $this->get($site_id);
@@ -77,7 +78,7 @@ class Sites extends TerminusCollection {
       $site->fetch();
       $cache_membership = $site->info();
 
-      if ($org_id) {
+      if (!is_null($org_id)) {
         $org = new Organization(null, array('id' => $org_id));
         $cache_membership['membership'] = array(
           'id' => $org_id,
@@ -110,10 +111,10 @@ class Sites extends TerminusCollection {
   /**
    * Fetches model data from API and instantiates its model instances
    *
-   * @param [boolean] $paged True to use paginated API requests
+   * @param [array] $options params to pass to url request
    * @return [Sites] $this
    */
-  public function fetch($paged = false) {
+  public function fetch($options = array()) {
     if (empty($this->models)) {
       $cache = $this->sites_cache->all();
       if (count($cache) === 0) {

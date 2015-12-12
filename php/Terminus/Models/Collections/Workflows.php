@@ -2,7 +2,6 @@
 
 namespace Terminus\Models\Collections;
 
-use TerminusCommand;
 use Terminus\Models\Workflow;
 use Terminus\Models\Collections\TerminusCollection;
 
@@ -26,11 +25,11 @@ class Workflows extends TerminusCollection {
     }
     $params = array_merge($this->getFetchArgs(), $options['params']);
 
-    $results = TerminusCommand::simpleRequest(
+    $results = $this->request->simpleRequest(
       $this->getFetchUrl(),
       array(
-        'method'   => 'post',
-        'data'     => array(
+        'method'      => 'post',
+        'form_params' => array(
           'type'   => $type,
           'params' => (object)$params
         )
@@ -45,17 +44,6 @@ class Workflows extends TerminusCollection {
     );
     $this->add($model);
     return $model;
-  }
-
-  /**
-   * Fetches model data from API and instantiates its model instances
-   *
-   * @param [boolean] $paged True to use paginated API requests
-   * @return [Workflows] $this
-   */
-  public function fetch($paged = false) {
-    parent::fetch(true);
-    return $this;
   }
 
   /**
@@ -90,11 +78,147 @@ class Workflows extends TerminusCollection {
         $url = sprintf(
           'users/%s/organizations/%s/workflows',
           $this->owner->user->id,
-          $this->owner->organization->id
+          $this->owner->get('id')
         );
           break;
     }
     return $url;
+  }
+
+  /**
+   * Fetches workflow data hydrated with operations
+   *
+   * @param [array] $options Additional information for the request
+   * @return [Workflows] $this
+   */
+  public function fetchWithOperations($options = array()) {
+    $options = array_merge(
+      $options,
+      array(
+        'fetch_args' => array(
+          'query' => array(
+            'hydrate' => 'operations'
+          )
+        )
+      )
+    );
+    $this->fetch($options);
+  }
+
+  /**
+   * Returns all existing workflows that have finished
+   *
+   * @return [Array<Workflows>] $workflows
+   */
+  public function allFinished() {
+    $workflows = array_filter(
+      $this->all(),
+      function($workflow) {
+        $is_finished = $workflow->isFinished();
+        return $is_finished;
+      }
+    );
+    return $workflows;
+  }
+
+  /**
+   * Returns all existing workflows that contain logs
+   *
+   * @return [Array<Workflows>] $workflows
+   */
+  public function allWithLogs() {
+    $workflows = $this->allFinished();
+    $workflows = array_filter(
+      $workflows,
+      function($workflow) {
+        $has_logs = $workflow->get('has_operation_log_output');
+        return $has_logs;
+      }
+    );
+
+    return $workflows;
+  }
+
+  /**
+   * Get timestamp of most recently finished workflow
+   *
+   * @return [integer] $timestamp
+   */
+  public function lastFinishedAt() {
+    $workflows = $this->all();
+    usort(
+      $workflows,
+      function($a, $b) {
+        $a_finished_after_b = $a->get('finished_at') >= $b->get('finished_at');
+        if ($a_finished_after_b) {
+          $cmp = -1;
+        } else {
+          $cmp = 1;
+        }
+        return $cmp;
+      }
+    );
+    if (count($workflows) > 0) {
+      $timestamp = $workflows[0]->get('finished_at');
+    } else {
+      $timestamp = null;
+    }
+    return $timestamp;
+  }
+
+  /**
+   * Get timestamp of most recently created Workflow
+   *
+   * @return [integer] $timestamp
+   */
+  public function lastCreatedAt() {
+    $workflows = $this->all();
+    usort(
+      $workflows,
+      function($a, $b) {
+        $a_created_after_b = $a->get('created_at') >= $b->get('created_at');
+        if ($a_created_after_b) {
+          $cmp = -1;
+        } else {
+          $cmp = 1;
+        }
+        return $cmp;
+      }
+    );
+    if (count($workflows) > 0) {
+      $timestamp = $workflows[0]->get('created_at');
+    } else {
+      $timestamp = null;
+    }
+    return $timestamp;
+  }
+
+  /**
+   * Get most-recent workflow from existingcollection that has logs
+   *
+   * @return [Workflow] $workflow
+   */
+  public function findLatestWithLogs() {
+    $workflows = $this->allWithLogs();
+    usort(
+      $workflows,
+      function($a, $b) {
+        $a_finished_after_b = $a->get('finished_at') >= $b->get('finished_at');
+        if ($a_finished_after_b) {
+          $cmp = -1;
+        } else {
+          $cmp = 1;
+        }
+        return $cmp;
+      }
+    );
+
+    if (count($workflows) > 0) {
+      $workflow = $workflows[0];
+    } else {
+      $workflow = null;
+    }
+    return $workflow;
   }
 
   /**
@@ -114,6 +238,19 @@ class Workflows extends TerminusCollection {
       )
     );
     return $owner_name;
+  }
+
+  /**
+   * Adds a model to this collection
+   *
+   * @param [stdClass] $model_data Data to feed into attributes of new model
+   * @param [array]    $options    Data to make properties of the new model
+   * @return [mixed] $model newly added model
+   */
+  public function add($model_data, $options = array()) {
+    $model = parent::add($model_data, $options = array());
+    $model->owner = $this->owner;
+    return $model;
   }
 
 }

@@ -6,22 +6,7 @@ use Terminus\Models\User;
 use Terminus\Models\Collections\TerminusCollection;
 
 class OrganizationSiteMemberships extends TerminusCollection {
-  protected $user;
-  protected $workflows;
-
-  /**
-   * Instantiates the collection, sets param members as properties
-   *
-   * @param [array] $options To be set to $this->key
-   * @return [TerminusCollection] $this
-   */
-  public function __construct($options = array()) {
-    parent::__construct($options);
-    $this->user      = new User();
-    $this->workflows = new Workflows(
-      array('owner' => $this, 'owner_type' => 'organization')
-    );
-  }
+  protected $organization;
 
   /**
    * Adds a site to this organization
@@ -30,7 +15,7 @@ class OrganizationSiteMemberships extends TerminusCollection {
    * @return [Workflow] $workflow
    */
   public function addMember($site) {
-    $workflow = $this->workflows->create(
+    $workflow = $this->organization->workflows->create(
       'add_organization_site_membership',
       array(
         'params'    => array(
@@ -81,11 +66,15 @@ class OrganizationSiteMemberships extends TerminusCollection {
   /**
    * Fetches model data from API and instantiates its model instances
    *
-   * @param [boolean] $paged True to use paginated API requests
+   * @param [array] $options params to pass to url request
    * @return [OrganizationSiteMemberships] $this
    */
-  public function fetch($paged = false) {
-    parent::fetch(true);
+  public function fetch($options = array()) {
+    if (!isset($options['paged'])) {
+      $options['paged'] = true;
+    }
+
+    parent::fetch($options);
     return $this;
   }
 

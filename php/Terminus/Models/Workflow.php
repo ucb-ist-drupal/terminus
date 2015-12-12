@@ -5,6 +5,7 @@ namespace Terminus\Models;
 use Terminus;
 use Terminus\Exceptions\TerminusException;
 use Terminus\Models\TerminusModel;
+use Terminus\Models\WorkflowOperation;
 
 class Workflow extends TerminusModel {
 
@@ -13,7 +14,7 @@ class Workflow extends TerminusModel {
    *
    * @return [string] $url URL to use in fetch query
    */
-  protected function getFetchUrl() {
+  public function getFetchUrl() {
     $url = '';
     switch ($this->getOwnerName()) {
       case 'user':
@@ -31,16 +32,32 @@ class Workflow extends TerminusModel {
         );
           break;
       case 'organization':
-        $user = $this->get('user');
         $url  = sprintf(
           'users/%s/organizations/%s/workflows/%s',
-          $user->id,
+          $this->owner->user->id,
           $this->owner->get('id'),
           $this->get('id')
         );
           break;
     }
     return $url;
+  }
+
+  /**
+   * Re-fetches workflow data hydrated with logs
+   *
+   * @return [Workflow] $this
+   */
+  public function fetchWithLogs() {
+    $options = array(
+      'fetch_args' => array(
+        'query' => array(
+          'hydrate' => 'operations_with_logs'
+        )
+      )
+    );
+    $this->fetch($options);
+    return $this;
   }
 
   /**
@@ -64,6 +81,60 @@ class Workflow extends TerminusModel {
   }
 
   /**
+   * Returns a list of WorkflowOperations for this workflow
+   *
+   * @return [Array<WorkflowOperation>] $operations list of WorkflowOperations
+   */
+  public function operations() {
+    if (is_array($this->get('operations'))) {
+      $operations_data = $this->get('operations');
+    } else {
+      $operations_data = array();
+    }
+
+    $operations = array();
+    foreach ($operations_data as $operation_data) {
+      $operations[] = new WorkflowOperation($operation_data);
+    }
+
+    return $operations;
+  }
+
+  /**
+   * Formats workflow object into an associative array for output
+   *
+   * @return [array] $data associative array of data for output
+   */
+  public function serialize() {
+    $user = 'Pantheon';
+    if (isset($this->get('user')->email)) {
+      $user = $this->get('user')->email;
+    }
+    if ($this->get('total_time')) {
+      $elapsed_time = $this->get('total_time');
+    } else {
+      $elapsed_time = time() - $this->get('created_at');
+    }
+
+    $operations_data = array();
+    foreach ($this->operations() as $operation) {
+      $operations_data[] = $operation->serialize();
+    }
+
+    $data = array(
+      'id'             => $this->id,
+      'env'            => $this->get('environment'),
+      'workflow'       => $this->get('description'),
+      'user'           => $user,
+      'status'         => $this->get('phase'),
+      'time'           => sprintf("%ds", $elapsed_time),
+      'operations'     => $operations_data
+    );
+
+    return $data;
+  }
+
+  /**
    * Waits on this workflow to finish
    *
    * @return [Workflow] $this
@@ -72,11 +143,17 @@ class Workflow extends TerminusModel {
     while (!$this->isFinished()) {
       $this->fetch();
       sleep(3);
-      // TODO: output this to stdout so that it doesn't get mixed with any actual output.
-      // We can't use the logger here because that might be redirected to a log-file and each line is timestamped.
+      /**
+       * TODO: Output this to stdout so that it doesn't get mixed with any
+       *   actual output. We can't use the logger here because that might be
+       *   redirected to a log file where each line is timestamped.
+       */
       fwrite(STDERR, '.');
     }
-    // TODO: output this to stdout so that it doesn't get mixed with any actual output.
+    /**
+     * TODO: Output this to stdout so that it doesn't get mixed with any
+     *   actual output.
+     */
     Terminus::line();
     if ($this->isSuccessful()) {
       return $this;

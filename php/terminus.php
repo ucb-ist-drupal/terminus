@@ -2,7 +2,7 @@
 
 //Can be used by plugins/themes to check if Terminus is running or not
 define('Terminus', true);
-define('TERMINUS_VERSION', '0.9.2');
+define('TERMINUS_VERSION', '0.9.3');
 
 $source = 'unknown';
 if ((PHP_SAPI == 'cli') && isset($argv)) {
@@ -16,7 +16,6 @@ include TERMINUS_ROOT . '/php/utils.php';
 include TERMINUS_ROOT . '/php/FileCache.php';
 include TERMINUS_ROOT . '/php/dispatcher.php';
 include TERMINUS_ROOT . '/php/class-terminus.php';
-include TERMINUS_ROOT . '/php/class-terminus-command.php';
 
 \Terminus\Utils\loadDependencies();
 
@@ -42,7 +41,9 @@ if (isset($_SERVER['TERMINUS_PORT']) && ($_SERVER['TERMINUS_PORT'] != '')) {
 define('TERMINUS_PORT', $port);
 
 $protocol = 'https';
-if (isset($_SERVER['TERMINUS_PROTOCOL']) && ($_SERVER['TERMINUS_PROTOCOL'] != '')) {
+if (isset($_SERVER['TERMINUS_PROTOCOL'])
+  && ($_SERVER['TERMINUS_PROTOCOL'] != '')
+) {
   $protocol = $_SERVER['TERMINUS_PROTOCOL'];
 }
 define('TERMINUS_PROTOCOL', $protocol);
@@ -54,7 +55,9 @@ if (isset($_SERVER['VCR_CASSETTE'])) {
   \VCR\VCR::insertCassette($_SERVER['VCR_CASSETTE']);
 }
 
-Terminus::getRunner()->run();
+if (isset($GLOBALS['argv'])) {
+  Terminus::getRunner()->run();
+}
 
 if (isset($_SERVER['VCR_CASSETTE'])) {
   \VCR\VCR::eject();

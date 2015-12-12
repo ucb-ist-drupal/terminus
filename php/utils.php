@@ -2,9 +2,11 @@
 
 namespace Terminus\Utils;
 
-use Terminus;
-use Terminus\Iterators\Transform;
 use ArrayIterator;
+use Terminus;
+use Terminus\Request;
+use Terminus\Iterators\Transform;
+use Terminus\Exceptions\TerminusException;
 
 if (!defined('JSON_PRETTY_PRINT')) {
   define('JSON_PRETTY_PRINT', 128);
@@ -28,6 +30,53 @@ function assocArgsToStr($assoc_args) {
   }
 
   return $return;
+}
+
+/**
+  * Retrieves current version number from repository and saves it to the cache
+  *
+  * @return [string] $response->name The version number
+  */
+function checkCurrentVersion() {
+  $request  = new Request();
+  $url      = 'https://api.github.com/repos/pantheon-systems/cli/releases';
+  $url     .= '?per_page=1';
+  $response = $request->simpleRequest($url, array('absolute_url' => true));
+  $release  = array_shift($response['data']);
+  Terminus::getCache()->putData(
+    'latest_release',
+    array('version' => $release->name, 'check_date' => time())
+  );
+  return $release->name;
+}
+
+/**
+  * Checks for new versions of Terminus once per week and saves to cache
+  *
+  * @return [void]
+  */
+function checkForUpdate() {
+  $cache_data = Terminus::getCache()->getData(
+    'latest_release',
+    array('decode_array' => true)
+  );
+  if (!$cache_data
+    || ((int)$cache_data['check_date'] < (int)strtotime('-7 days'))
+  ) {
+    $logger = Terminus::getLogger();
+    try {
+      $current_version = checkCurrentVersion();
+      if (version_compare($current_version, TERMINUS_VERSION, '>')) {
+        $logger->info(
+          'An update to Terminus is available. Please update to {version}.',
+          array('version' => $current_version)
+        );
+      }
+    } catch (\Exception $e) {
+      $logger->info($e->getMessage());
+      $logger->info('Cannot retrieve current Terminus version.');
+    }
+  }
 }
 
 /**
@@ -120,7 +169,7 @@ function isWindows() {
  * @return [void]
  */
 function loadAllCommands() {
-  $cmd_dir = TERMINUS_ROOT . '/php/commands';
+  $cmd_dir = TERMINUS_ROOT . '/php/Terminus/Commands';
 
   $iterator = new \DirectoryIterator($cmd_dir);
 
@@ -134,13 +183,44 @@ function loadAllCommands() {
 }
 
 /**
+ * Loads a file of the given name from the assets directory.
+ *
+ * @param [string] $file Relative file path from the assets dir
+ * @return [string] $asset_location Contents of the asset file
+ */
+function loadAsset($file) {
+  $asset_location = sprintf('%s/assets/%s', TERMINUS_ROOT, $file);
+  /**
+   * The warning reporting is disabled because missing files will both issue
+   * warnings and return false, and we cannot just catch the warning such as
+   * things are currently set.
+   */
+  error_reporting(E_ALL ^ E_WARNING);
+  $asset_file = file_get_contents($asset_location);
+  error_reporting(E_ALL);
+
+  if (!$asset_file) {
+    throw new TerminusException(
+      'Terminus could not locate an asset file at {asset_location}',
+      compact('asset_location'),
+      1
+    );
+  }
+  return $asset_file;
+}
+
+/**
  * Includes a single command file
  *
  * @param [string] $name Of command of which the class file will be included
  * @return [void]
  */
 function loadCommand($name) {
-  $path = TERMINUS_ROOT . "/php/commands/$name.php";
+  $path = sprintf(
+    '%s/php/Terminus/Commands/%sCommand.php',
+    TERMINUS_ROOT,
+    ucwords($name)
+  );
 
   if (is_readable($path)) {
     include_once $path;
@@ -183,32 +263,6 @@ function loadDependencies() {
  */
 function loadFile($path) {
   require $path;
-}
-
-/**
- * Render PHP or other types of files using Mustache templates
- * IMPORTANT: Automatic HTML escaping is disabled!
- *
- * @param [string] $template_name File name of the template to be used
- * @param [array]  $data          Context to pass through for template use
- * @return [string] $rendered_template The rendered template
- */
-function mustacheRender($template_name, $data) {
-  if (!file_exists($template_name)) {
-    $template_name = TERMINUS_ROOT . "/templates/$template_name";
-  }
-
-  $template = file_get_contents($template_name);
-
-  $mustache = new \Mustache_Engine(
-    array(
-      'escape' => function ($val) {
-        return $val;
-      }
-    )
-  );
-  $rendered_template = $mustache->render($template, $data);
-  return $rendered_template;
 }
 
 /**
@@ -280,3 +334,51 @@ function sqlFromZip($filename) {
   $file = preg_replace('#\.gz$#s', '', $filename);
   return $file;
 }
+
+/**
+  * Strips sensitive data out of the JSON printed in a request string
+  *
+  * @param [string] $request   The string with a JSON with sensitive data
+  * @param [array]  $blacklist Array of string keys to remove from request
+  * @return [string] $result Sensitive data-stripped version of $request
+  */
+function stripSensitiveData($request, $blacklist = array()) {
+  //Locate the JSON in the string, turn to array
+  $regex = '~\{(.*)\}~';
+  preg_match($regex, $request, $matches);
+  $request_array = json_decode($matches[0], true);
+
+  //See if a blacklisted items are in the arrayed JSON, replace
+  foreach ($blacklist as $blacklisted_item) {
+    if (isset($request_array[$blacklisted_item])) {
+      $request_array[$blacklisted_item] = '*****';
+    }
+  }
+
+  //Turn array back to JSON, put back in string
+  $result = str_replace($matches[0], json_encode($request_array), $request);
+  return $result;
+}
+
+/**
+ * Render PHP or other types of files using Twig templates
+ *
+ * @param [string] $template_name File name of the template to be used
+ * @param [array]  $data          Context to pass through for template use
+ * @param [array]  $options       Options to pass through for template use
+ * @return [string] $rendered_template The rendered template
+ */
+function twigRender($template_name, $data, $options) {
+  $loader            = new \Twig_Loader_Filesystem(TERMINUS_ROOT . '/templates');
+  $twig              = new \Twig_Environment($loader);
+  $rendered_template = $twig->render(
+    $template_name,
+    array(
+      'data'          => $data,
+      'template_name' => $template_name,
+      'options'       => $options,
+    )
+  );
+  return $rendered_template;
+}
+

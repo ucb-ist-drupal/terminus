@@ -3,7 +3,7 @@
 namespace Terminus;
 
 use Terminus;
-use TerminusCommand;
+use Terminus\Request;
 use Terminus\Session;
 
 /**
@@ -31,6 +31,7 @@ use Terminus\Session;
 class SitesCache {
   protected $cache;
   protected $cachekey;
+  protected $request;
 
   /**
    * Object constructor, saves cache to cache property
@@ -40,6 +41,7 @@ class SitesCache {
   public function __construct() {
     $this->cache    = Terminus::getCache();
     $this->cachekey = Session::instance()->get('user_uuid', '') . '_sites';
+    $this->request  = new Request();
   }
 
   /**
@@ -63,7 +65,7 @@ class SitesCache {
    * @return [array] $sites
    */
   public function add($memberships_data = array()) {
-    $cache = (array)$this->cache->get_data(
+    $cache = (array)$this->cache->getData(
       $this->cachekey,
       array('decode_array' => true)
     );
@@ -91,7 +93,7 @@ class SitesCache {
     }
 
     // and save the cache
-    $this->cache->put_data($this->cachekey, $cache);
+    $this->cache->putData($this->cachekey, $cache);
 
     $sites = $this->all();
     return $sites;
@@ -103,7 +105,7 @@ class SitesCache {
    * @return [array] $cache_data
    */
   public function all() {
-    $cache_data = $this->cache->get_data(
+    $cache_data = $this->cache->getData(
       $this->cachekey,
       array('decode_array' => true)
     );
@@ -120,7 +122,7 @@ class SitesCache {
    * @return [void]
    */
   public function clear() {
-    $this->cache->put_data($this->cachekey, array());
+    $this->cache->putData($this->cachekey, array());
   }
 
   /**
@@ -177,7 +179,7 @@ class SitesCache {
    */
   public function rebuild() {
     // Clear out the cache
-    $this->cache->put_data($this->cachekey, array());
+    $this->cache->putData($this->cachekey, array());
 
     // Add user's own sites
     $this->add($this->fetchUserSites());
@@ -200,12 +202,12 @@ class SitesCache {
    * @return [void'
    */
   public function remove($sitename) {
-    $cache = (array)$this->cache->get_data(
+    $cache = (array)$this->cache->getData(
       $this->cachekey,
       array('decode_array' => true)
     );
     unset($cache[$sitename]);
-    $this->cache->put_data($this->cachekey, $cache);
+    $this->cache->putData($this->cachekey, $cache);
   }
 
   /**
@@ -216,7 +218,7 @@ class SitesCache {
    * @return [array] $memberships_data
    */
   private function fetchOrganizationSites($org_data) {
-    $response = TerminusCommand::pagedRequest(
+    $response = $this->request->pagedRequest(
       'organizations/' . $org_data['id'] . '/memberships/sites'
     );
 
@@ -237,7 +239,7 @@ class SitesCache {
    */
   private function fetchUserSites() {
     $user_id  = Session::getValue('user_uuid');
-    $response = TerminusCommand::pagedRequest(
+    $response = $this->request->pagedRequest(
       'users/' . $user_id . '/memberships/sites'
     );
 
@@ -264,7 +266,7 @@ class SitesCache {
    *         [string] type Always "organization"
    */
   private function fetchUserOrganizations() {
-    $response = TerminusCommand::pagedRequest(
+    $response = $this->request->pagedRequest(
       'users/' . Session::getValue('user_uuid') . '/memberships/organizations'
     );
 

@@ -3,7 +3,6 @@
 namespace Terminus\Models;
 
 use Terminus;
-use TerminusCommand;
 use Terminus\Exceptions\TerminusException;
 use Terminus\Models\Organization;
 use Terminus\Models\TerminusModel;
@@ -84,9 +83,9 @@ class Site extends TerminusModel {
    */
   public function addTag($tag, $org) {
     $params   = array($tag => array('sites' => array($this->get('id'))));
-    $response = TerminusCommand::simpleRequest(
+    $response = $this->request->simpleRequest(
       sprintf('organizations/%s/tags', $org),
-      array('method' => 'put', 'data' => $params)
+      array('method' => 'put', 'form_params' => $params)
     );
     return $response;
   }
@@ -127,7 +126,7 @@ class Site extends TerminusModel {
   public function attributes() {
     $path   = 'attributes';
     $method = 'GET';
-    $atts   = TerminusCommand::request(
+    $atts   = $this->request->request(
       'sites',
       $this->get('id'),
       $path,
@@ -144,7 +143,7 @@ class Site extends TerminusModel {
    */
   public function bindings($type = null) {
     if (empty($this->bindings)) {
-      $response = TerminusCommand::simpleRequest(
+      $response = $this->request->simpleRequest(
         'sites/' . $this->get('id') . '/' . $bindings
       );
       foreach ($response['data'] as $id => $binding) {
@@ -169,17 +168,13 @@ class Site extends TerminusModel {
    * @return [Workflow] $workflow
    */
   public function createBranch($branch) {
-    $data     = array('refspec' => sprintf('refs/heads/%s', $branch));
-    $options  = array(
-      'body'    => json_encode($data),
-      'headers' => array('Content-type' => 'application/json')
-    );
-    $response = TerminusCommand::request(
+    $form_params = array('refspec' => sprintf('refs/heads/%s', $branch));
+    $response    = $this->request->request(
       'sites',
       $this->get('id'),
       'code-branch',
       'POST',
-      $options
+      compact('form_params')
     );
     return $response['data'];
   }
@@ -190,7 +185,7 @@ class Site extends TerminusModel {
    * @return [array] $response
    */
   public function delete() {
-    $response = TerminusCommand::simpleRequest(
+    $response = $this->request->simpleRequest(
       'sites/' . $this->get('id'),
       array('method' => 'delete')
     );
@@ -247,11 +242,11 @@ class Site extends TerminusModel {
   /**
    * Fetches this object from Pantheon
    *
-   * @param [boolean] $paged True to use paginated API requests
+   * @param [array] $options params to pass to url request
    * @return [Site] $this
    */
-  public function fetch($paged = true) {
-    $response         = TerminusCommand::simpleRequest(
+  public function fetch($options = array()) {
+    $response         = $this->request->simpleRequest(
       sprintf('sites/%s?site_state=true', $this->get('id'))
     );
     $this->attributes = $response['data'];
@@ -279,7 +274,7 @@ class Site extends TerminusModel {
    */
   public function getFeature($feature) {
     if (!isset($this->features)) {
-      $response       = TerminusCommand::simpleRequest(
+      $response       = $this->request->simpleRequest(
         sprintf('sites/%s/features', $this->get('id'))
       );
       $this->features = (array)$response['data'];
@@ -335,7 +330,7 @@ class Site extends TerminusModel {
    * @return [stdClass] $response['data']
    */
   public function getUpstreamUpdates() {
-    $response = TerminusCommand::simpleRequest(
+    $response = $this->request->simpleRequest(
       'sites/' . $this->get('id') .  '/code-upstream-updates'
     );
     return $response['data'];
@@ -428,7 +423,11 @@ class Site extends TerminusModel {
     }
 
     if ($key) {
-      return isset($info[$key]) ? $info[$key] : null;
+      if (isset($info[$key])) {
+        return $info[$key];
+      } else {
+        return null;
+      }
     } else {
       return $info;
     }
@@ -441,7 +440,7 @@ class Site extends TerminusModel {
    */
   public function newRelic() {
     $path     = 'new-relic';
-    $response = TerminusCommand::simpleRequest(
+    $response = $this->request->simpleRequest(
       'sites/' . $this->get('id') . '/new-relic'
     );
     return $response['data'];
@@ -479,7 +478,7 @@ class Site extends TerminusModel {
    * @return [array] $response
    */
   public function removeTag($tag, $org) {
-    $response = TerminusCommand::simpleRequest(
+    $response = $this->request->simpleRequest(
       sprintf(
         'organizations/%s/tags/%s/sites?entity=%s',
         $org,
@@ -521,7 +520,7 @@ class Site extends TerminusModel {
    */
   public function tips() {
     $path = 'code-tips';
-    $data = TerminusCommand::request('sites', $this->get('id'), $path, 'GET');
+    $data = $this->request->request('sites', $this->get('id'), $path, 'GET');
     return $data['data'];
   }
 
@@ -532,21 +531,39 @@ class Site extends TerminusModel {
    * @return [stdClass] $response['data']
    */
   public function updateServiceLevel($level) {
-    $path     = 'service-level';
-    $method   = 'PUT';
-    $data     = $level;
-    $options  = array(
-      'body' => json_encode($data),
-      'headers' => array('Content-type' => 'application/json')
-    );
-    $response = TerminusCommand::request(
-      'sites',
-      $this->get('id'),
-      $path,
-      $method,
-      $options
-    );
-    return $response['data'];
+    if (!in_array(
+      $level,
+      array('free', 'basic', 'pro', 'business', 'elite')
+    )
+    ) {
+      throw new TerminusException(
+        'Service level "{level}" is invalid.',
+        compact('level'),
+        1
+      );
+    }
+    $path        = 'service-level';
+    $method      = 'PUT';
+    $form_params = $level;
+    try {
+      $response = $this->request->request(
+        'sites',
+        $this->get('id'),
+        $path,
+        $method,
+        compact('form_params')
+      );
+      return $response['data'];
+    } catch (\Exception $e) {
+      if (strpos($e->getMessage(), '403') !== false) {
+        throw new TerminusException(
+          'Instrument required to increase service level',
+          array(),
+          1
+        );
+      }
+      throw $e;
+    }
   }
 
   /**

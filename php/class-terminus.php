@@ -29,6 +29,7 @@ class Terminus {
     $leaf_name = array_pop($path);
     $full_path = $path;
     $command   = self::getRootCommand();
+    $class     = "Terminus\\Commands\\$class";
 
     while (!empty($path)) {
       $subcommand_name = $path[0];
@@ -239,7 +240,7 @@ class Terminus {
    */
   static function isTest() {
     $is_test = (boolean)getenv('CLI_TEST_MODE')
-      || (boolean)getenv('VCR_CASSETTTE');
+      || (boolean)getenv('VCR_CASSETTE');
     return $is_test;
   }
 

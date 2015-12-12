@@ -1,13 +1,14 @@
 <?php
 
-use Behat\Behat\Context\BehatContext;
+use Behat\Behat\Context\Context;
 use Behat\Gherkin\Node\PyStringNode;
 
 /**
  * Features context for Behat feature testing
  */
-class FeatureContext extends BehatContext {
+class FeatureContext implements Context {
   public $cliroot = '';
+  private $_cache_file_name;
   private $_parameters;
   private $_output;
   private $_start_time;
@@ -15,14 +16,15 @@ class FeatureContext extends BehatContext {
   /**
   * Initializes context
   *
-  * @param [array] $parameters Context parameters, set through behat.yml
+  * @param [array] $parameters Parameters from the Behat YAML config file
   * @return [void]
   */
-  public function __construct(array $parameters) {
+  public function __construct($parameters) {
     date_default_timezone_set('UTC');
     $this->cliroot          = dirname(dirname(__DIR__)) . '/..';
     $this->_parameters      = $parameters;
     $this->_start_time      = time();
+    $this->_cache_file_name = $_SERVER['HOME'] . '/.terminus/cache/session';
     $this->_connection_info = array(
       'username' => $parameters['username'],
       'password' => $parameters['password'],
@@ -60,8 +62,8 @@ class FeatureContext extends BehatContext {
    */
   public function aSiteNamed($site) {
     $output = $this->iGetInfoForTheSite($site);
-    if(!$this->_checkResult('created', $output)) {
-      $this->iCreateASiteNamed('Drupal 7', $site);
+    if (!$this->_checkResult('created', $output)) {
+      $this->iCreateSiteNamed('Drupal 7', $site);
       $recurse = $this->aSiteNamed($site);
       return $recurse;
     }
@@ -73,13 +75,13 @@ class FeatureContext extends BehatContext {
    * @Given /^a site named "([^"]*)" belonging to "([^"]*)"$/
    *
    * @param [string] $site Name of site to ensure exists
-   * @param [string] $site Name or UUID of site to ensure ownership
+   * @param [string] $org  Name or UUID of organization to ensure ownership
    * @return [boolean] Always true, else errs
    */
   public function aSiteNamedBelongingTo($site, $org) {
     $output = $this->iGetInfoForTheSite($site);
-    if(!$this->_checkResult($site, $output)) {
-      $this->iCreateASiteNamed('Drupal 7', $site, $org);
+    if (!$this->_checkResult($site, $output)) {
+      $this->iCreateSiteNamed('Drupal 7', $site, $org);
       $recurse = $this->aSiteNamedBelongingTo($site, $org);
       return $recurse;
     }
@@ -109,7 +111,7 @@ class FeatureContext extends BehatContext {
    */
   public function connectionMode($site, $mode = false) {
     $command = "terminus site connection-mode --env=dev --site=$site";
-    if($mode !== false) {
+    if ($mode !== false) {
       $command .= " --set=$mode";
     }
     $this->iRun($command);
@@ -217,10 +219,11 @@ class FeatureContext extends BehatContext {
    * @Then /^I check the URL "([^"]*)" for validity$/
    *
    * @param [string] $url URL to check for validity
+   * @return [void]
    */
   public function iCheckTheUrlForValidity($url) {
     $url = $this->_replacePlaceholders($url);
-    if(filter_var($url, FILTER_VALIDATE_URL) === false) {
+    if (filter_var($url, FILTER_VALIDATE_URL) === false) {
       throw new Exception("$url URL is not valid.");
     }
   }
@@ -231,8 +234,8 @@ class FeatureContext extends BehatContext {
    *
    * @return [void]
    */
-  public function iCheckTheUserIAmLoggedInAs() {
-    $this->iRun("terminus auth whoami");
+  public function iCheckTheUserAmLoggedInAs() {
+    $this->iRun('terminus auth whoami');
   }
 
   /**
@@ -294,9 +297,10 @@ class FeatureContext extends BehatContext {
    *
    * @param [string] $upstream Which upstream to use as new site's source
    * @param [string] $name     Name of site to create
+   * @param [string] $org      Name or UUID of organization to own the new site
    * @return [void]
    */
-  public function iCreateASiteNamed($upstream, $name, $org = false) {
+  public function iCreateSiteNamed($upstream, $name, $org = false) {
     $append_org = '';
     if ($org !== false) {
       $append_org = '--org=' . $org;
@@ -332,7 +336,6 @@ class FeatureContext extends BehatContext {
     $this->iRun("terminus site delete --site=$site --yes");
   }
 
-
   /**
     * @Given /^I deploy the "([^"]*)" environment from "([^"]*)" of "([^"]*)" with the message "([^"]*)"$/
     *
@@ -350,6 +353,18 @@ class FeatureContext extends BehatContext {
   }
 
   /**
+   * Intentionally expires the user's session
+   * @When /^I expire my session$/
+   *
+   * @return [void]
+   */
+  public function iExpireMySession() {
+    $session = json_decode(file_get_contents($this->_cache_file_name));
+    $session->session_expire_time = -386299860;
+    file_put_contents($this->_cache_file_name, $session);
+  }
+
+  /**
    * Queries for info for a given site
    * @Given /^I get info for the site "([^"]*)"$/
    *
@@ -359,19 +374,54 @@ class FeatureContext extends BehatContext {
    */
   public function iGetInfoForTheSite($site, $return_hash = false) {
     $return = $this->iRun("terminus site info --site=$site --format=bash");
-    if(!$return_hash) {
+    if (!$return_hash) {
       return $return;
     }
 
     $return_array = array();
     $return_lines = explode("\n", $return);
-    foreach($return_lines as $line) {
+    foreach ($return_lines as $line) {
       $line_components = explode(" ", $line);
       $index  = $line_components[0];
       $values = array_splice($line_components, 1);
       $return_array[$index] = $values;
     }
     return $return_array;
+  }
+
+  /**
+   * Checks which user Terminus is operating as
+   * @Given /^I have at least "([^"]*)" site$/
+   * @Given /^I have at least "([^"]*)" sites$/
+   *
+   * @param [integer] $min The minimum number of sites to have
+   * @return [boolean] $has_the_min
+   */
+  public function iHaveAtLeastSite($min) {
+    $sites       = json_decode($this->iRun('terminus sites list --format=json'));
+    $has_the_min = ($min <= count($sites));
+    if (!$has_the_min) {
+      throw new Exception(count($sites) . ' sites found.');
+    }
+    return $has_the_min;
+  }
+
+  /**
+   * Checks which user Terminus is operating as
+   * @Given /^I have "([^"]*)" site$/
+   * @Given /^I have "([^"]*)" sites$/
+   * @Given /^I have no sites$/
+   *
+   * @param [integer] $num The number of sites to have
+   * @return [boolean] $has_amount
+   */
+  public function iHaveSites($num = 0) {
+    $sites      = json_decode($this->iRun('terminus sites list --format=json'));
+    $has_amount = ($num === count($sites));
+    if (!$has_amount) {
+      throw new Exception(count($sites) . ' sites found.');
+    }
+    return $has_amount;
   }
 
   /**
@@ -409,16 +459,16 @@ class FeatureContext extends BehatContext {
     $this->iRun("terminus site hostnames list --site=$site --env=$env");
   }
 
-    /**
-     * Checks the
-     * @Given /^I check the payment instrument of "([^"]*)"$/
-     *
-     * @param [string] $site Name of site to check payment instrument of
-     * @return [void]
-     */
-    public function iCheckThePaymentInstrumentOfSite($site) {
-      $this->iRun("terminus site set-instrument --site=$site");
-    }
+  /**
+   * Checks the
+   * @Given /^I check the payment instrument of "([^"]*)"$/
+   *
+   * @param [string] $site Name of site to check payment instrument of
+   * @return [void]
+   */
+  public function iCheckThePaymentInstrumentOfSite($site) {
+    $this->iRun("terminus site set-instrument --site=$site");
+  }
 
   /**
    * Lists all sites user is on the team of
@@ -427,7 +477,7 @@ class FeatureContext extends BehatContext {
    * @return [void]
    */
   public function iListTheSites() {
-    $this->iRun("terminus sites list");
+    $this->iRun('terminus sites list');
   }
 
   /**
@@ -470,6 +520,20 @@ class FeatureContext extends BehatContext {
   }
 
   /**
+   * Logs in user
+   * @When /^I log in via refresh token "([^"]*)"$/
+   * @When /^I log in via refresh token$/
+   *
+   * @param [string] $token An Auth0 refresh token
+   * @return [void]
+   */
+  public function iLogInViaRefreshToken(
+      $token = '[[refresh_token]]'
+  ) {
+    $this->iRun("terminus auth login --refresh=$token");
+  }
+
+  /**
    * Logs user out
    * @When /^I log out$/
    *
@@ -489,20 +553,20 @@ class FeatureContext extends BehatContext {
    * @param [string] $site     Name of the site to back up
    * @return [void]
    */
-  public function iMakeABackupElementsOfTheEnvironment($elements, $env, $site) {
+  public function iMakeBackupElementsOfTheEnvironment($elements, $env, $site) {
     $this->iRun(
       "terminus site backups create --site=$site --env=$env --element=$elements"
     );
   }
 
   /**
-    * @When /^I merge the "([^"]*)" environment into the "([^"]*)" environment on "([^"]*)"$/
-    *
-    * @param [string] $from_env Environment to merge from
-    * @param [string] $to_env   Environment to merge into
-    * @param [string] $site     Name of site on which to merge environments
-    * @return [void]
-    */
+   * @When /^I merge the "([^"]*)" environment into the "([^"]*)" environment on "([^"]*)"$/
+   *
+   * @param [string] $from_env Environment to merge from
+   * @param [string] $to_env   Environment to merge into
+   * @param [string] $site     Name of site on which to merge environments
+   * @return [void]
+   */
   public function iMergeTheEnvironment($from_env, $to_env, $site) {
     $this->setTestStatus('pending');
   }
@@ -533,24 +597,24 @@ class FeatureContext extends BehatContext {
   }
 
   /**
-  * @When /^I run "([^"]*)"$/
-  * Runs command and saves output
-  *
-  * @param [string] $command To be entered as CL stdin
-  * @return [string] Returns output of command run
-  */
+   * @When /^I run "([^"]*)"$/
+   * Runs command and saves output
+   *
+   * @param [string] $command To be entered as CL stdin
+   * @return [string] Returns output of command run
+   */
   public function iRun($command) {
     $command      = $this->_replacePlaceholders($command);
     $regex        = '/(?<!\.)terminus/';
     $terminus_cmd = sprintf('bin/terminus', $this->cliroot);
-    if($this->_cassette_name) {
+    if ($this->_cassette_name) {
       $command = 'VCR_CASSETTE=' . $this->_cassette_name . ' ' . $command;
     }
-    if(isset($this->_parameters['vcr_mode'])) {
+    if (isset($this->_parameters['vcr_mode'])) {
       $command = 'VCR_MODE=' . $this->_parameters['vcr_mode']
         . ' ' . $command;
     }
-    if(isset($this->_connection_info['host'])) {
+    if (isset($this->_connection_info['host'])) {
       $command = 'TERMINUS_HOST=' . $this->_connection_info['host']
         . ' ' . $command;
     }
@@ -581,15 +645,33 @@ class FeatureContext extends BehatContext {
    * @Then /^I should get one of the following: "([^"]*)"$/
    * Checks the output for the given substrings, comma-separated
    *
-   * @param [array] $list_string Content which ought not be in the output
+   * @param [array] $list_string Content which ought to be in the output
    * @return [boolean] True if a $string exists in output
     */
   public function iShouldGetOneOfTheFollowing($list_string) {
     $strings  = explode(',', $list_string);
     foreach ($strings as $string) {
-      if($this->_checkResult(trim((string)$string), $this->_output)) {
+      if ($this->_checkResult(trim((string)$string), $this->_output)) {
         return true;
       }
+    }
+    throw new Exception("Actual output:\n" . $this->_output);
+  }
+
+  /**
+   * @Then /^I should not get one of the following:$/
+   * @Then /^I should not get one of the following "([^"]*)"$/
+   * @Then /^I should not get one of the following: "([^"]*)"$/
+   * Checks the output for the given substrings, comma-separated
+   *
+   * @param [array] $list_string Content which ought not be in the output
+   * @return [boolean] True if a $string does not exist in output
+    */
+  public function iShouldNotGetOneOfTheFollowing($list_string) {
+    try {
+      $this->iShouldGetOneOfTheFollowing($list_string);
+    } catch (Exception $e) {
+      return true;
     }
     throw new Exception("Actual output:\n" . $this->_output);
   }
@@ -600,11 +682,11 @@ class FeatureContext extends BehatContext {
    *
    * @return [boolean] True if new backup exists
    */
-  public function iShouldHaveANewBackup() {
+  public function iShouldHaveNewBackup() {
     $regex = "/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/";
     preg_match_all($regex, $this->_output, $matches);
-    foreach($matches[0] as $date) {
-      if($this->_start_time < strtotime($date)) {
+    foreach ($matches[0] as $date) {
+      if ($this->_start_time < strtotime($date)) {
         return true;
       }
     }
@@ -636,7 +718,7 @@ class FeatureContext extends BehatContext {
    * @return [boolean] True if $string does not exist in output
    */
   public function iShouldNotGet($string) {
-    if($this->_checkResult((string)$string, $this->_output)) {
+    if ($this->_checkResult((string)$string, $this->_output)) {
       throw new Exception("Actual output:\n" . $this->_output);
     }
     return true;
@@ -651,7 +733,7 @@ class FeatureContext extends BehatContext {
    */
   public function noSiteNamed($site) {
     $output = $this->iGetInfoForTheSite($site);
-    if($this->_checkResult('created', $output)) {
+    if ($this->_checkResult('created', $output)) {
       $this->iDeleteTheSiteNamed($site);
       $status = $this->noSiteNamed($site);
       return $status;
@@ -671,7 +753,7 @@ class FeatureContext extends BehatContext {
    */
   public function serviceLevel($site, $service_level = false) {
     $command = "terminus site set-service-level --site=$site";
-    if($service_level !== false) {
+    if ($service_level !== false) {
       $command .= " --set=$service_level";
     }
     $this->iRun($command);
@@ -685,7 +767,7 @@ class FeatureContext extends BehatContext {
    * @return [boolean] Always true, else errs
    */
   public function setTestStatus($status) {
-    if($status == 'pending') {
+    if ($status == 'pending') {
       throw new Exception("Implementation of this functionality is pending.");
     }
     throw new Exception("Test explicitly set to $status");
@@ -714,13 +796,13 @@ class FeatureContext extends BehatContext {
     $unformatted_tags = $event->getScenario()->getTags();
     $tags = array();
 
-    foreach($unformatted_tags as $tag) {
+    foreach ($unformatted_tags as $tag) {
       $tag_elements = explode(' ', $tag);
       $index        = null;
-      if(count($tag_elements < 1)) {
+      if (count($tag_elements < 1)) {
         $index = array_shift($tag_elements);
       }
-      if(count($tag_elements == 1)) {
+      if (count($tag_elements == 1)) {
         $tag_elements = array_shift($tag_elements);
       }
       $tags[$index] = $tag_elements;
@@ -740,46 +822,46 @@ class FeatureContext extends BehatContext {
     switch(php_uname('s')) {
       case "Linux":
         $cmd = "xdg-open";
-        break;
+          break;
       case "Darwin":
         $cmd = "open";
-        break;
+          break;
       case "Windows NT":
         $cmd = "start";
-        break;
+          break;
     }
     exec("$cmd $url");
   }
 
   /**
-  * Reads one line from STDIN
-  *
-  * @return [string] $line
-  */
+   * Reads one line from STDIN
+   *
+   * @return [string] $line
+   */
   private function _read() {
     $line = trim(fgets(STDIN));
     return $line;
   }
 
   /**
-  * Exchanges values in given string with square brackets for values
-  * in $this->_parameters
-  *
-  * @param [string] $string       The string to perform replacements on
-  * @param [array]  $replacements Used to replace with non-parameters
-  * @return [string] $string The modified param string
-  */
+   * Exchanges values in given string with square brackets for values
+   * in $this->_parameters
+   *
+   * @param [string] $string       The string to perform replacements on
+   * @param [array]  $replacements Used to replace with non-parameters
+   * @return [string] $string The modified param string
+   */
   private function _replacePlaceholders($string, $replacements = array()) {
     $regex = '~\[\[(.*?)\]\]~';
     preg_match_all($regex, $string, $matches);
-    if(empty($replacements)) {
+    if (empty($replacements)) {
       $replacements = $this->_parameters;
     }
 
-    foreach($matches[1] as $id => $replacement_key) {
-      if(isset($replacements[$replacement_key])) {
+    foreach ($matches[1] as $id => $replacement_key) {
+      if (isset($replacements[$replacement_key])) {
         $replacement = $replacements[$replacement_key];
-        if(is_array($replacement)) {
+        if (is_array($replacement)) {
           $replacement = array_shift($replacement);
         }
         $string = str_replace($matches[0][$id], $replacement, $string);
@@ -790,17 +872,18 @@ class FeatureContext extends BehatContext {
   }
 
   /**
-  * Sets $this->_cassette_name and returns name of the cassette to be used.
-  *
-  * @param [array] $event Feature information from Behat
-  * @return [string] Of scneario name, lowercase, with underscores and suffix
-  */
+   * Sets $this->_cassette_name and returns name of the cassette to be used.
+   *
+   * @param [array] $event Feature information from Behat
+   * @return [string] Of scneario name, lowercase, with underscores and suffix
+   */
   private function _setCassetteName($event) {
     $tags = $this->_getTags($event);
     $this->_cassette_name = false;
-    if(isset($tags['vcr'])) {
+    if (isset($tags['vcr'])) {
       $this->_cassette_name = $tags['vcr'];
     }
     return $this->_cassette_name;
   }
+
 }

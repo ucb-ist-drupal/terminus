@@ -4,9 +4,9 @@ namespace Terminus\Models;
 
 use Terminus\Models\Collections\UserOrganizationMemberships;
 use Terminus\Models\TerminusModel;
-use \Terminus\Models\Collections\Instruments;
-use \Terminus\Models\Collections\Workflows;
-use \Terminus\Session;
+use Terminus\Models\Collections\Instruments;
+use Terminus\Models\Collections\Workflows;
+use Terminus\Session;
 
 class User extends TerminusModel {
   public $organizations;
@@ -77,7 +77,7 @@ class User extends TerminusModel {
       $path = 'sites';
     }
     $method   = 'GET';
-    $response = \TerminusCommand::request('users', $this->id, $path, $method);
+    $response = $this->request->request('users', $this->id, $path, $method);
     return $response['data'];
   }
 
@@ -89,8 +89,9 @@ class User extends TerminusModel {
   private function setAliases() {
     $path     = 'drush_aliases';
     $method   = 'GET';
-    $response = \TerminusCommand::request('users', $this->id, $path, $method);
+    $response = $this->request->request('users', $this->id, $path, $method);
 
     $this->aliases = $response['data']->drush_aliases;
   }
+
 }
