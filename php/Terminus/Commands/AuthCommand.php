@@ -1,27 +1,20 @@
 <?php
 
-/**
- * Authenticate to Pantheon and store a local secret token.
- */
-
 namespace Terminus\Commands;
 
 use Terminus;
 use Terminus\Session;
-use Terminus\Utils;
 use Terminus\Commands\TerminusCommand;
+use Terminus\Helpers\Input;
 
+/**
+ * Authenticate to Pantheon and store a local secret token.
+ */
 class AuthCommand extends TerminusCommand {
   private $auth;
-  private $logged_in = false;
-  private $sessionid;
-  private $session_cookie_name = 'X-Pantheon-Session';
-  private $uuid;
 
   /**
    * Instantiates object, sets auth property
-   *
-   * @return [AuthCommand] $this
    */
   public function __construct() {
     parent::__construct();
@@ -39,43 +32,52 @@ class AuthCommand extends TerminusCommand {
    * : Log in non-interactively with this password. Useful for automation.
    *
    * [--machine-token=<value>]
-   * : Authenticate using an Auth0 token
+   * : Authenticates using a machine token from your dashboard. Stores the
+   *   token for future use.
    *
-   * [--session=<value>]
-   * : Authenticate using an existing session token
    * [--debug]
    * : dump call information when logging in.
    */
   public function login($args, $assoc_args) {
-    // Try to login using a machine token, if provided.
-    if (isset($assoc_args['machine-token'])
-      || (empty($args) && isset($_SERVER['TERMINUS_MACHINE_TOKEN']))
+    if (!empty($args)) {
+      $email = array_shift($args);
+    }
+    if (isset($assoc_args['machine-token'])) {
+      // Try to log in using a machine token, if provided.
+      $token_data = ['token' => $assoc_args['machine-token']];
+      $this->auth->logInViaMachineToken($token_data);
+    } elseif (isset($email) && $this->auth->tokenExistsForEmail($email)) {
+      // Try to log in using a machine token, if the account email was provided.
+      $this->auth->logInViaMachineToken(compact('email'));
+    } elseif (empty($args) && isset($_SERVER['TERMINUS_MACHINE_TOKEN'])) {
+      // Try to log in using a machine token, if it's in the $_SERVER.
+      $token_data = ['token' => $_SERVER['TERMINUS_MACHINE_TOKEN']];
+      $this->auth->logInViaMachineToken($token_data);
+    } elseif (isset($_SERVER['TERMINUS_USER'])
+      && $this->auth->tokenExistsForEmail($_SERVER['TERMINUS_USER'])
     ) {
-      if (isset($assoc_args['machine-token'])) {
-        $token = $assoc_args['machine-token'];
-      } elseif (isset($_SERVER['TERMINUS_MACHINE_TOKEN'])) {
-        $token = $_SERVER['TERMINUS_MACHINE_TOKEN'];
-      }
-      $this->auth->logInViaMachineToken($token);
-    } elseif (isset($assoc_args['session'])) {
-      $this->auth->logInViaSessionToken($assoc_args['session']);
+      // Try to log in using a machine token, if $_SERVER provides account email.
+      $this->auth->logInViaMachineToken(['email' => $_SERVER['TERMINUS_USER']]);
+    } elseif (!isset($email)
+      && $only_token = $this->auth->getOnlySavedToken()
+    ) {
+      // Try to log in using a machine token, if there is only one saved token.
+      $this->auth->logInViaMachineToken($only_token);
     } else {
       // Otherwise, do a normal email/password-based login.
-      if (empty($args)) {
+      if (!isset($email)) {
         if (isset($_SERVER['TERMINUS_USER'])) {
           $email = $_SERVER['TERMINUS_USER'];
         } else {
-          $email = Terminus::prompt('Your email address?', null);
+          $email = Input::prompt(['message' => 'Your email address?']);
         }
-      } else {
-        $email = $args[0];
       }
 
       if (isset($assoc_args['password'])) {
         $password = $assoc_args['password'];
       } else {
-        $password = Terminus::promptSecret(
-          'Your dashboard password (input will not be shown)'
+        $password = Input::promptSecret(
+          ['message' => 'Your dashboard password (input will not be shown)']
         );
       }
 
@@ -98,10 +100,11 @@ class AuthCommand extends TerminusCommand {
    */
   public function whoami() {
     if (Session::getValue('user_uuid')) {
-      $this->output()->outputValue(
-        Session::getValue('user_uuid'),
-        'You are authenticated as'
-      );
+      $user = Session::getUser();
+      $user->fetch();
+
+      $data = $user->serialize();
+      $this->output()->outputRecord($data);
     } else {
       $this->failure('You are not logged in.');
     }

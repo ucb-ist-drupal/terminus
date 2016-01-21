@@ -4,44 +4,56 @@ namespace Terminus;
 
 use Terminus;
 use Terminus\Utils;
-use Terminus\Loggers\Logger;
 use Terminus\Exceptions\TerminusException;
+use Terminus\Loggers\Logger;
 
 class Runner {
-  public $config;
-  public $extra_config;
-
-  private $arguments;
-  private $assoc_args;
-  private $colorize;
-
   /**
-   * @var LoggerInterface
+   * @var array
+   */
+  private $arguments;
+  /**
+   * @var array
+   */
+  private $assoc_args;
+  /**
+   * @var array
+   */
+  private $config;
+  /**
+   * @var Configurator
+   */
+  private $configurator;
+  /**
+   * @var Logger
    */
   private $logger;
-
   /**
-   * @var OutputterInterface
+   * @var Terminus
    */
-  private $outputter;
+  private $terminus;
 
   /**
-   * Constructs object. Initializes config, colorizaiton, loger, and outputter
+   * Constructs object. Initializes config, colorization, loger, and outputter
    *
-   * @return [Runner] $this
+   * @param array $config Extra settings for the config property
    */
-  public function __construct() {
-    $this->initConfig();
-    $this->initColorizaiton();
-    $this->initLogger();
-    $this->initOutputter();
+  public function __construct($config = array()) {
+    $this->setConfigurator();
+    $this->setConfig($config);
+    $params          = array(
+      'runner' => $this,
+    );
+    $params          = array_merge($this->config, $params);
+    $this->terminus  = new Terminus($params);
+    $this->logger    = Terminus::getLogger();
   }
 
   /**
    * Retrieves properties requested
    *
-   * @param [string] $key Property name to return
-   * @return [mixed] $this->$key
+   * @param string $key Property name to return
+   * @return mixed
    */
   public function __get($key) {
     if (($key[0] == '_') || (!isset($this->$key))) {
@@ -53,8 +65,12 @@ class Runner {
   /**
    * Identifies the command to be run
    *
-   * @param [array] $args The non-hyphenated (--) terms from the CL
-   * @return [array] $command_array
+   * @param array $args The non-hyphenated (--) terms from the CL
+   * @return array
+   *   0 => [Terminus\Dispatcher\RootCommand]
+   *   1 => [array] args
+   *   2 => [array] command path
+   * @throws TerminusException
    */
   public function findCommandToRun($args) {
     $command = Terminus::getRootCommand();
@@ -82,18 +98,18 @@ class Runner {
   }
 
   /**
-   * Determines if output is to be colorized
+   * Retrieves the configurator property
    *
-   * @return [boolean] $this->colorize
+   * @return Configurator
    */
-  public function inColor() {
-    return $this->colorize;
+  public function getConfigurator() {
+    return $this->configurator;
   }
 
   /**
    * Runs the Terminus command
    *
-   * @return [void]
+   * @return void
    */
   public function run() {
     if (empty($this->arguments)) {
@@ -114,6 +130,7 @@ class Runner {
       // Show synopsis if it's a composite command.
       $r = $this->findCommandToRun($this->arguments);
       if (is_array($r)) {
+        /** @var \Terminus\Dispatcher\RootCommand $command */
         list($command) = $r;
 
         if ($command->canHaveSubcommands()) {
@@ -137,22 +154,17 @@ class Runner {
   /**
    * Runs a command
    *
-   * @param [array] $args       The non hyphenated (--) terms from the CL
-   * @param [array] $assoc_args The hyphenated terms from the CL
-   * @return [void]
+   * @param array $args       The non hyphenated (--) terms from the CL
+   * @param array $assoc_args The hyphenated terms from the CL
+   * @return void
    */
   public function runCommand($args, $assoc_args = array()) {
     try {
+      /** @var \Terminus\Dispatcher\RootCommand $command */
       list($command, $final_args, $cmd_path) = $this->findCommandToRun($args);
       $name = implode(' ', $cmd_path);
 
-      if (isset($this->extra_config[$name])) {
-        $extra_args = $this->extra_config[$name];
-      } else {
-        $extra_args = array();
-      }
-
-      $command->invoke($final_args, $assoc_args, $extra_args);
+      $command->invoke($final_args, $assoc_args);
 
     } catch (\Exception $e) {
       if (method_exists($e, 'getReplacements')) {
@@ -167,82 +179,51 @@ class Runner {
   /**
    * Runs a command via runCommand by supplying it with properties as args
    *
-   * @return [void]
+   * @return void
    */
   private function _runCommand() {
     $this->runCommand($this->arguments, $this->assoc_args);
   }
 
   /**
-   * Initializes colorization and saves to Runner property
-   *
-   * @return [void]
-   */
-  private function initColorizaiton() {
-    if ($this->config['colorize'] == 'auto') {
-      $this->colorize = !\cli\Shell::isPiped();
-    } else {
-      $this->colorize = $this->config['colorize'];
-    }
-  }
-
-  /**
    * Initializes configurator, saves config data to it
    *
-   * @return [void]
+   * @param array $config Config options to set explicitly
+   * @return void
    */
-  private function initConfig() {
+  private function setConfig($config = array()) {
     $args = array('terminus', '--debug');
     if (isset($GLOBALS['argv'])) {
       $args = $GLOBALS['argv'];
     }
-    $configurator = Terminus::getConfigurator();
 
     // Runtime config and args
-    list($args, $assoc_args, $runtime_config) = $configurator->parseArgs(
+    list($args, $assoc_args, $runtime_config) = $this->configurator->parseArgs(
       array_slice($args, 1)
     );
 
     $this->arguments  = $args;
     $this->assoc_args = $assoc_args;
 
-    $configurator->mergeArray($runtime_config);
+    $this->configurator->mergeArray($runtime_config);
 
-    list($this->config, $this->extra_config) = $configurator->toArray();
+    $this->config = array_merge($this->configurator->toArray(), $config);
   }
 
   /**
-   * Initializes logger and saves it to Terminus property
+   * Sets the configurator property
    *
-   * @return [void]
+   * @param Configurator|null $configurator Configurator object to set
+   * @return void
    */
-  private function initLogger() {
-    $this->logger = new Logger(array('config' => $this->config));
-    Terminus::setLogger($this->logger);
-  }
-
-  /**
-   * Initializes outputter and saves it to Terminus property
-   *
-   * @return [void]
-   */
-  private function initOutputter() {
-    // Pick an output formatter
-    if ($this->config['format'] == 'json') {
-      $formatter = new Terminus\Outputters\JSONFormatter();
-    } elseif ($this->config['format'] == 'bash') {
-      $formatter = new Terminus\Outputters\BashFormatter();
+  private function setConfigurator(Configurator $configurator = null) {
+    if (is_null($configurator)) {
+      $this->configurator = new Configurator(
+        TERMINUS_ROOT . '/php/config-spec.php'
+      );
     } else {
-      $formatter = new Terminus\Outputters\PrettyFormatter();
+      $this->configurator = $configurator;
     }
-
-    // Create an output service.
-    $this->outputter = new Terminus\Outputters\Outputter(
-      new Terminus\Outputters\StreamWriter('php://stdout'),
-      $formatter
-    );
-
-    Terminus::setOutputter($this->outputter);
   }
 
 }

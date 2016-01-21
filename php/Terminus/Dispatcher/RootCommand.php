@@ -12,8 +12,6 @@ class RootCommand extends CompositeCommand {
 
   /**
    * Object constructor, sets object properties
-   *
-   * @return [RootCommand] $this
    */
   function __construct() {
     $this->parent    = false;
@@ -24,8 +22,8 @@ class RootCommand extends CompositeCommand {
   /**
    * Finds a subcommand of the root command
    *
-   * @param [array] $args Arguments to parse into subcommands
-   * @return [mixed] $this->$subcommands[$command] or false if DNE
+   * @param array $args Arguments to parse into subcommands
+   * @return Subcommand|false
    */
   function findSubcommand(&$args) {
     $command = array_shift($args);
@@ -41,12 +39,13 @@ class RootCommand extends CompositeCommand {
   /**
    * Returns long description of this command by parsing the docs
    *
-   * @return [string] $binding
+   * @return array
    */
   function getLongdesc() {
     $binding = array();
+    $spec    = Terminus::getRunner()->getConfigurator()->getSpec();
 
-    foreach (Terminus::getConfigurator()->getSpec() as $key => $details) {
+    foreach ($spec as $key => $details) {
       if (($details['runtime'] === false)
         || isset($details['deprecated'])
         || (isset($details['hidden']))
@@ -73,7 +72,7 @@ class RootCommand extends CompositeCommand {
   /**
    * Returns all subcommands of the root command
    *
-   * @return [array] $subcommands An array of Subcommand objects
+   * @return Subcommand[]
    */
   function getSubcommands() {
     Utils\loadAllCommands();

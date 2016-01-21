@@ -8,18 +8,18 @@ namespace Terminus;
  **/
 class Endpoint {
   public $patterns = array(
-    'deprecated'   => '/terminus.php?%s=%s',
-    'private'      => '/api/%s/%s',
-    'public'       => '/api/%s',
-    'login'        => '/api/authorize',
-    'auth/refresh' => '/auth/refresh',
+    'deprecated'  => '/Terminus.php?%s=%s',
+    'private'     => '/api/%s/%s',
+    'public'      => '/api/%s',
+    'login'       => '/api/authorize',
+    'authorize'   => '/api/authorize/machine-token',
   );
 
   private $public_realms = array(
     'upstreams',
   );
 
-  // Some "realms" are different on Hermes than on terminus.php.
+  // Some "realms" are different on Hermes than on Terminus.php.
   public $realm_map = array(
     'user'    => 'users',
     'site'    => 'sites'
@@ -29,8 +29,6 @@ class Endpoint {
 
   /**
    * Object constructor. Sets target property to private.
-   *
-   * @return [Endpoint] $this
    */
   public function __construct() {
     $this->target = 'private';
@@ -41,8 +39,8 @@ class Endpoint {
    * endpoint. Once we're fully committed to the 2.0 api we can clean it up a
    * bit.
    *
-   * @param [array] $args Should contain a realm and uuid, can also have a path
-   * @return [string] $url
+   * @param array $args Should contain a realm and uuid, can also have a path
+   * @return string
    *
    *    Example:
    *
@@ -63,8 +61,8 @@ class Endpoint {
       $this->target = 'login';
     }
 
-    if (isset($args['realm']) && ($args['realm'] == 'auth/refresh')) {
-      $this->target = 'auth/refresh';
+    if (isset($args['realm']) && ($args['realm'] == 'authorize')) {
+      $this->target = 'authorize';
     }
 
     //A substiution array to pass to the vsprintf
@@ -85,10 +83,10 @@ class Endpoint {
 
   /**
    * Retrieves an endpoint
-   * @param [array] $args Elements as follow:
+   * @param array $args Elements as follow:
    *        [string] realm user, site, organization
    *        [string] path specific method to call
-   * @return [string] $endpoint_string
+   * @return stringß
    */
   static function get($args) {
     $endpoint        = new Endpoint($args);

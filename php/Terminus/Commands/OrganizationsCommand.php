@@ -4,10 +4,12 @@ namespace Terminus\Commands;
 
 use Terminus;
 use Terminus\Auth;
+use Terminus\Session;
 use Terminus\Helpers\Input;
 use Terminus\Commands\TerminusCommand;
 use Terminus\Models\User;
 use Terminus\Models\Organization;
+use Terminus\Models\OrganizationSiteMembership;
 use Terminus\Models\Collections\Sites;
 use Terminus\Models\Collections\UserOrganizationMemberships;
 
@@ -29,7 +31,7 @@ class OrganizationsCommand extends TerminusCommand {
    * @subcommand list
    */
   public function all($args, $assoc_args) {
-    $user          = new User();
+    $user          = Session::getUser();
     $data          = array();
     $organizations = $user->getOrganizations();
     foreach ($organizations as $id => $org) {
@@ -64,11 +66,11 @@ class OrganizationsCommand extends TerminusCommand {
    */
   public function sites($args, $assoc_args) {
     $action   = array_shift($args);
-    $org_id   = Input::orgid(
-      $assoc_args,
-      'org',
-      null,
-      array('allow_none' => false)
+    $org_id   = Input::orgId(
+      array(
+        'args'       => $assoc_args,
+        'allow_none' => false,
+      )
     );
     // TODO: clarify that these are OrganizationMemberships, not Organization models
     $orgs      = new UserOrganizationMemberships();
@@ -95,15 +97,18 @@ class OrganizationsCommand extends TerminusCommand {
         } else {
           $site = $this->sites->get(
             Input::menu(
-              $this->getNonmemberSiteList($memberships),
-              null,
-              'Choose site'
+              array(
+                'choices' => $this->getNonmemberSiteList($memberships),
+                'message' => 'Choose site'
+              )
             )
           );
         }
-        Terminus::confirm(
-          'Are you sure you want to add %s to %s ?',
-          array($site->get('name'), $org_info->profile->name)
+        Input::confirm(
+          array(
+            'message' => 'Are you sure you want to add %s to %s ?',
+            'context' => array($site->get('name'), $org_info->profile->name),
+          )
         );
         $workflow = $org_model->site_memberships->addMember($site);
         $workflow->wait();
@@ -125,16 +130,19 @@ class OrganizationsCommand extends TerminusCommand {
         } else {
           $site = $this->sites->get(
             Input::menu(
-              $this->getMemberSiteList($memberships),
-              null,
-              'Choose site'
+              array(
+                'choices' => $this->getMemberSiteList($memberships),
+                'message' => 'Choose site',
+              )
             )
           );
         }
         $member = $org_model->site_memberships->get($site->get('id'));
-        Terminus::confirm(
-          'Are you sure you want to remove %s from %s ?',
-          array($site->get('name'), $org_info->profile->name)
+        Input::confirm(
+          array(
+            'message' => 'Are you sure you want to remove %s from %s ?',
+            'context' => array($site->get('name'), $org_info->profile->name),
+          )
         );
         $workflow = $member->removeMember();
         $workflow->wait();
@@ -142,6 +150,7 @@ class OrganizationsCommand extends TerminusCommand {
           break;
       case 'list':
       default:
+        $data = [];
         foreach ($memberships as $membership) {
           if (isset($assoc_args['tag'])
             && !(in_array($assoc_args['tag'], $membership->get('tags')))
@@ -162,8 +171,22 @@ class OrganizationsCommand extends TerminusCommand {
               $data_array[$key] = $site->$key;
             }
           }
-          $data_array['created'] = date('Y-m-dTH:i:s', $data_array['created']);
+          $data_array['created'] = date(
+            'Y-m-dTH:i:s',
+            strtotime($data_array['created'])
+          );
           $data[] = $data_array;
+        }
+        if (empty($data)) {
+          $message = 'No sites match your ';
+          if (empty($assoc_args)
+            || ((count($assoc_args) == 1) && (isset($assoc_args['org'])))
+          ) {
+            $message .= 'criterion.';
+          } else {
+            $message .= 'criteria.';
+          }
+          $this->log()->info($message);
         }
         $this->output()->outputRecordList($data);
           break;
@@ -181,11 +204,11 @@ class OrganizationsCommand extends TerminusCommand {
    * @subcommand team
    */
   public function team($args, $assoc_args) {
-    $org_id = Input::orgid(
-      $assoc_args,
-      'org',
-      null,
-      array('allow_none' => false)
+    $org_id = Input::orgId(
+      array(
+        'args'       => $assoc_args,
+        'allow_none' => false,
+      )
     );
     $orgs = new UserOrganizationMemberships();
     $org  = $orgs->get($org_id);
@@ -227,10 +250,10 @@ class OrganizationsCommand extends TerminusCommand {
   /**
    * Retrieves a succinct list of member sites
    *
-   * @param [array] $memberships Members of this org
-   * @return [array] $list
+   * @param OrganizationSiteMembership[] $memberships Members of this org
+   * @return array
    */
-  private function getMemberSiteList($memberships) {
+  private function getMemberSiteList(array $memberships) {
     $list = array();
     foreach ($memberships as $membership) {
       $site = $membership->get('site');
@@ -242,8 +265,8 @@ class OrganizationsCommand extends TerminusCommand {
   /**
    * Retrieves a succinct list of non-member sites
    *
-   * @param [array] $memberships Members of this org
-   * @return [array] $list
+   * @param OrganizationSiteMembership[] $memberships Members of this org
+   * @return array
    */
   private function getNonmemberSiteList($memberships) {
     $members = $this->getMemberSiteList($memberships);
@@ -255,8 +278,8 @@ class OrganizationsCommand extends TerminusCommand {
   /**
    * Determines whether the site is a member of an org
    *
-   * @param [array] $memberships Members of this org
-   * @return [boolean] $is_member
+   * @param OrganizationSiteMembership[] $memberships Members of this org
+   * @return bool
    */
   private function siteIsMember($memberships, $site_id) {
     $list      = $this->getMemberSiteList($memberships);

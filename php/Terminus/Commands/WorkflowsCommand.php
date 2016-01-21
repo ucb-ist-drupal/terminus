@@ -21,8 +21,6 @@ class WorkflowsCommand extends TerminusCommand {
 
   /**
    * Object constructor.
-   *
-   * @return [WorkflowsCommand] $this
    */
   public function __construct() {
     Auth::ensureLogin();
@@ -31,7 +29,7 @@ class WorkflowsCommand extends TerminusCommand {
   }
 
   /**
-   * List Worflows for a Site
+   * List Workflows for a Site
    *
    * ## OPTIONS
    * [--site=<site>]
@@ -40,11 +38,13 @@ class WorkflowsCommand extends TerminusCommand {
    * @subcommand list
    */
   public function index($args, $assoc_args) {
-    $site      = $this->sites->get(Input::sitename($assoc_args));
+    $site = $this->sites->get(
+      Input::siteName(array('args' => $assoc_args))
+    );
     $site->workflows->fetch(array('paged' => false));
     $workflows = $site->workflows->all();
 
-    $data      = array();
+    $data = array();
     foreach ($workflows as $workflow) {
       $workflow_data = $workflow->serialize();
       unset($workflow_data['operations']);
@@ -73,7 +73,7 @@ class WorkflowsCommand extends TerminusCommand {
    * @subcommand show
    */
   public function show($args, $assoc_args) {
-    $site = $this->sites->get(Input::sitename($assoc_args));
+    $site = $this->sites->get(Input::siteName(array('args' => $assoc_args)));
 
     if (isset($assoc_args['workflow_id'])) {
       $workflow_id = $assoc_args['workflow_id'];
@@ -89,7 +89,7 @@ class WorkflowsCommand extends TerminusCommand {
     } else {
       $site->workflows->fetch(array('paged' => false));
       $workflows = $site->workflows->all();
-      $workflow = Input::workflow($workflows);
+      $workflow = Input::workflow(compact('workflows'));
     }
     $workflow->fetchWithLogs();
 
@@ -124,11 +124,11 @@ class WorkflowsCommand extends TerminusCommand {
               $operation->description(),
               $operation->get('log_output')
             );
-            $this->log()->info($log_msg);
+            $this->output()->outputValue($log_msg);
           }
         }
       } else {
-        $this->log()->info('Workflow has no operations');
+        $this->output()->outputValue('Workflow has no operations');
       }
     } else {
       $this->output()->outputRecord($workflow_data);
@@ -145,7 +145,7 @@ class WorkflowsCommand extends TerminusCommand {
    * @subcommand watch
    */
   public function watch($args, $assoc_args) {
-    $site = $this->sites->get(Input::sitename($assoc_args));
+    $site = $this->sites->get(Input::siteName(array('args' => $assoc_args)));
 
     // Keep track of workflows that have been printed.
     // This is necessary because the local clock may drift from

@@ -4,26 +4,37 @@ namespace Terminus\Dispatcher;
 
 use Terminus;
 use Terminus\Exceptions\TerminusException;
+use Terminus\DocParser;
 
 /**
  * A leaf node in the command tree.
  */
 class Subcommand extends CompositeCommand {
 
+  /**
+   * @var string
+   */
   private $alias;
 
+  /**
+   * @var callable
+   */
   private $when_invoked;
 
   /**
    * Object constructor. Sets object properties
    *
-   * @param [RootCommand] $parent       Parent command dispatcher object
-   * @param [string]      $name         Name of command to run
-   * @param [DocParser]   $docparser    DocParser object for analysis of docs
-   * @param [Closure]     $when_invoked Indicates classes & methods to use
-   * @return [CompositeCommand] $this
+   * @param CompositeCommand $parent       Parent command dispatcher object
+   * @param string           $name         Name of command to run
+   * @param DocParser        $docparser    DocParser object for analysis of docs
+   * @param callable         $when_invoked Indicates classes & methods to use
    */
-  public function __construct($parent, $name, $docparser, $when_invoked) {
+  public function __construct(
+    CompositeCommand $parent,
+    $name,
+    DocParser $docparser,
+    callable $when_invoked
+  ) {
     parent::__construct($parent, $name, $docparser);
     $this->when_invoked = $when_invoked;
     $this->alias        = $docparser->getTag('alias');
@@ -36,7 +47,7 @@ class Subcommand extends CompositeCommand {
   /**
    * Tells whether there can be subcommands of this object
    *
-   * @return [boolean] Always false
+   * @return bool Always false
    */
   public function canHaveSubcommands() {
     return false;
@@ -45,7 +56,7 @@ class Subcommand extends CompositeCommand {
   /**
    * Gets the synopsis of the command this object represents
    *
-   * @return [string] $this->synopsis
+   * @return string
    */
   public function getSynopsis() {
     return $this->synopsis;
@@ -54,7 +65,7 @@ class Subcommand extends CompositeCommand {
   /**
    * Gets the alias of the command this object represents
    *
-   * @return [string] $this->alias
+   * @return string
    */
   public function getAlias() {
     return $this->alias;
@@ -63,18 +74,18 @@ class Subcommand extends CompositeCommand {
   /**
    * Displays the usage parameters of the command this object represents
    *
-   * @param [string] $prefix Prefix for this command's usage
-   * @return [void]
+   * @param string $prefix Prefix for this command's usage
+   * @return void
    */
   public function showUsage($prefix = 'usage: ') {
-    Terminus::line($this->getUsage($prefix));
+    Terminus::getOutputter()->line($this->getUsage($prefix));
   }
 
   /**
    * Gets the usage parameters of the command this object represents
    *
-   * @param [string] $prefix Prefix to usage string
-   * @return [string] $usage
+   * @param string $prefix Prefix to usage string
+   * @return string
    */
   public function getUsage($prefix) {
     $usage = sprintf(
@@ -89,16 +100,12 @@ class Subcommand extends CompositeCommand {
   /**
    * Displays the usage parameters of the command this object represents
    *
-   * @param [array] $args       Array of command line non-params and non-flags
-   * @param [array] $assoc_args Array of command line params and flags
-   * @param [array] $extra_args Any additional arguments dispatcher assembled
-   * @return [void]
+   * @param array $args       Array of command line non-params and non-flags
+   * @param array $assoc_args Array of command line params and flags
+   * @return void
    */
-  public function invoke($args, $assoc_args, $extra_args) {
-    if (Terminus::getConfig('interactive')) {
-      list($args, $assoc_args) = $this->promptArgs($args, $assoc_args);
-    }
-    $to_unset = $this->validateArgs($args, $assoc_args, $extra_args);
+  public function invoke(array $args, array $assoc_args) {
+    $to_unset = $this->validateArgs($args, $assoc_args);
     foreach ($to_unset as $key) {
       unset($assoc_args[$key]);
     }
@@ -106,15 +113,15 @@ class Subcommand extends CompositeCommand {
     call_user_func(
       $this->when_invoked,
       $args,
-      array_merge($extra_args, $assoc_args)
+      $assoc_args
     );
   }
 
   /**
-   * Parses thhe synopsis into an array
+   * Parses the synopsis into an array
    *
-   * @param [string] $longdesc The synopsis to parse
-   * @return [array] $synopsis
+   * @param string $longdesc The synopsis to parse
+   * @return array
    */
   private static function extractSynopsis($longdesc) {
     preg_match_all('/(.+?)[\r\n]+:/', $longdesc, $matches);
@@ -125,11 +132,12 @@ class Subcommand extends CompositeCommand {
   /**
    * Parses the arguments for prompting in interactive mode
    *
-   * @param [array] $args       Array of command line non-params and non-flags
-   * @param [array] $assoc_args Array of command line params and flags
-   * @return [array] $args_array Elements as follows:
+   * @param array $args       Array of command line non-params and non-flags
+   * @param array $assoc_args Array of command line params and flags
+   * @return array Elements as follows:
    *         [array] Array of command line non-params and non-flags
    *         [array] Array of command line params and flags
+   * @todo This function is unused; remove?
    */
   private function promptArgs($args, $assoc_args) {
     $synopsis = $this->getSynopsis();
@@ -173,7 +181,9 @@ class Subcommand extends CompositeCommand {
             $key_prompt = str_repeat(" ", strlen($current_prompt)) . $key_token;
           }
 
-          $key = Terminus::prompt($key_prompt, $default);
+          $key = Input::prompt(
+            array('message' => $key_prompt, 'default' => $default)
+          );
           if ($key === false) {
             return array($args, $assoc_args);
           }
@@ -183,7 +193,9 @@ class Subcommand extends CompositeCommand {
             $value_prompt     =
               str_repeat(' ', $key_prompt_count) . '=' . $value_token;
 
-            $value = Terminus::prompt($value_prompt, $default);
+            $value = Input::prompt(
+              array('message' => $value_prompt, 'default' => $default)
+            );
             if (false === $value) {
               return array($args, $assoc_args);
             }
@@ -204,7 +216,7 @@ class Subcommand extends CompositeCommand {
           $prompt .= ' (Y/n)';
         }
 
-        $response = Terminus::prompt($prompt, $default);
+        $response = Input::prompt(array('message' => $prompt, 'default' => $default));
         if (false === $response) {
           return array($args, $assoc_args);
         }
@@ -238,12 +250,12 @@ class Subcommand extends CompositeCommand {
   /**
    * Decides which arguments are invalid for this command
    *
-   * @param [array] $args       Array of command line non-params and non-flags
-   * @param [array] $assoc_args Array of command line params and flags
-   * @param [array] $extra_args Any additional arguments dispatcher assembled
-   * @return [array] A list of invalid $assoc_args keys to unset
+   * @param array $args       Array of command line non-params and non-flags
+   * @param array $assoc_args Array of command line params and flags
+   * @return array A list of invalid $assoc_args keys to unset
+   * @throws TerminusException
    */
-  private function validateArgs($args, $assoc_args, $extra_args) {
+  private function validateArgs($args, $assoc_args) {
     $synopsis = $this->getSynopsis();
     if (!$synopsis) {
       return array();
@@ -268,7 +280,8 @@ class Subcommand extends CompositeCommand {
       if ($invalid) {
         throw new TerminusException(
           'Invalid positional value: {invalid}',
-          array('invalid' => $invalid)
+          compact('invalid'),
+          1
         );
       }
     }
@@ -277,11 +290,12 @@ class Subcommand extends CompositeCommand {
     if (!empty($unknownPositionals)) {
       throw new TerminusException(
         'Too many positional arguments: {args}',
-        array('args' => implode(' ', $unknownPositionals))
+        ['args' => implode(' ', $unknownPositionals)],
+        1
       );
     }
     list($errors, $to_unset) = $validator->validateAssoc(
-      array_merge(Terminus::getConfig(), $extra_args, $assoc_args)
+      array_merge(Terminus::getConfig(), $assoc_args)
     );
     foreach ($validator->unknownAssoc($assoc_args) as $key) {
       $errors['fatal'][] = "unknown --$key parameter";
@@ -292,7 +306,7 @@ class Subcommand extends CompositeCommand {
         $out .= "\n " . $error;
       }
 
-      throw new TerminusException($out);
+      throw new TerminusException($out, [], 1);
     }
     foreach ($errors['warning'] as $warning) {
       Terminus::getLogger()->warning($warning);

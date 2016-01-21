@@ -23,8 +23,6 @@ class SitesCommand extends TerminusCommand {
 
   /**
    * Shows a list of your sites on Pantheon
-   *
-   * @return [SitesCommand] $this
    */
   public function __construct() {
     Auth::ensureLogin();
@@ -46,12 +44,20 @@ class SitesCommand extends TerminusCommand {
    *   '~/.drush/pantheon.aliases.drushrc.php' will be used.
    */
   public function aliases($args, $assoc_args) {
-    $user     = new User();
-    $print    = Input::optional('print', $assoc_args, false);
+    $user     = Session::getUser();
+    $print    = Input::optional(
+      array(
+        'key'     => 'print',
+        'choices' => $assoc_args,
+        'default' => false,
+      )
+    );
     $location = Input::optional(
-      'location',
-      $assoc_args,
-      getenv('HOME') . '/.drush/pantheon.aliases.drushrc.php'
+      array(
+        'key'     => 'location',
+        'choices' => $assoc_args,
+        'default' => getenv('HOME') . '/.drush/pantheon.aliases.drushrc.php',
+      )
     );
 
     if (is_dir($location)) {
@@ -78,7 +84,7 @@ class SitesCommand extends TerminusCommand {
     if ($file_exists) {
       $message = 'Pantheon aliases updated';
     }
-    if (strpos($content, 'pantheon.io') === false) {
+    if (strpos($content, 'array') === false) {
       $message .= ', although you have no sites';
     }
     $this->log()->info($message);
@@ -112,7 +118,7 @@ class SitesCommand extends TerminusCommand {
    */
   public function create($args, $assoc_args) {
     $options  = $this->getSiteCreateOptions($assoc_args);
-    $upstream = Input::upstream($assoc_args, 'upstream');
+    $upstream = Input::upstream(array('args' => $assoc_args));
     $options['upstream_id'] = $upstream->get('id');
     $this->log()->info(
       'Creating new {upstream} installation ... ',
@@ -161,7 +167,13 @@ class SitesCommand extends TerminusCommand {
   public function import($args, $assoc_args) {
     $options = SitesCommand::getSiteCreateOptions($assoc_args);
 
-    $url = Input::string($assoc_args, 'url', 'URL of archive to import');
+    $url = Input::string(
+      array(
+        'args'    => $assoc_args,
+        'key'     => 'url',
+        'message' => 'URL of archive to import',
+      )
+    );
     if (!$url) {
       $this->logger->error('Please enter a URL.');
     }
@@ -196,13 +208,16 @@ class SitesCommand extends TerminusCommand {
    *   and also is the basis for loading individual sites by name
    *
    * [--team]
-   * : filter sites you are a team member of
+   * : Filter sites you are a team member of
    *
    * [--org=<id>]
-   * : filter sites you can access via the organization
+   * : Filter sites you can access via the organization
+   *
+   * [--name=<regex>]
+   * : Filter sites you can access via name
    *
    * [--cached]
-   * : causes the command to return cached sites list instead of retrieving anew
+   * : Causes the command to return cached sites list instead of retrieving anew
    *
    * @subcommand list
    * @alias show
@@ -263,6 +278,19 @@ class SitesCommand extends TerminusCommand {
       );
     }
 
+    if (isset($assoc_args['name'])) {
+      $search_string = $assoc_args['name'];
+
+      $rows = array_filter(
+        $rows,
+        function($site) use ($search_string) {
+          preg_match("~$search_string~", $site['name'], $matches);
+          $is_match = !empty($matches);
+          return $is_match;
+        }
+      );
+    }
+
     if (count($rows) == 0) {
       $this->log()->warning('You have no sites.');
     }
@@ -313,15 +341,39 @@ class SitesCommand extends TerminusCommand {
       $this->sites->rebuildCache();
     }
 
-    $upstream = Input::optional('upstream', $assoc_args, false);
+    $upstream = Input::optional(
+      array(
+        'key'     => 'upstream',
+        'choices' => $assoc_args,
+        'default' => false,
+      )
+    );
     $data     = array();
-    $report   = Input::optional('report', $assoc_args, false);
-    $confirm  = Input::optional('confirm', $assoc_args, false);
-    $tag      = Input::optional('tag', $assoc_args, false);
+    $report   = Input::optional(
+      array(
+        'key'     => 'report',
+        'choices' => $assoc_args,
+        'default' => false,
+      )
+    );
+    $confirm   = Input::optional(
+      array(
+        'key'     => 'confirm',
+        'choices' => $assoc_args,
+        'default' => false,
+      )
+    );
+    $tag       = Input::optional(
+      array(
+        'key'     => 'tag',
+        'choices' => $assoc_args,
+        'default' => false,
+      )
+    );
 
     $org = '';
     if ($tag) {
-      $org = Input::orgid($assoc_args, 'org');
+      $org = Input::orgId(array('args' => $assoc_args));
     }
     $sites = $this->sites->filterAllByTag($tag, $org);
 
@@ -366,15 +418,32 @@ class SitesCommand extends TerminusCommand {
           );
           continue;
         }
-        $updatedb = !Input::optional($assoc_args, 'updatedb', false);
-        $xoption  = Input::optional($assoc_args, 'xoption', 'theirs');
+        $updatedb = !Input::optional(
+          array(
+            'key'     => 'updatedb',
+            'choices' => $assoc_args,
+            'default' => false,
+          )
+        );
+        $xoption  = !Input::optional(
+          array(
+            'key'     => 'xoption',
+            'choices' => $assoc_args,
+            'default' => 'theirs',
+          )
+        );
         if (!$report) {
-          $confirmed = Input::yesno(
-            'Apply upstream updates to %s ( run update.php:%s, xoption:%s ) ',
+          $message = 'Apply upstream updates to %s ';
+          $message .= '( run update.php:%s, xoption:%s ) ';
+          $confirmed = Input::confirm(
             array(
-              $site->get('name'),
-              var_export($updatedb, 1),
-              var_export($xoption, 1)
+              'message' => $message,
+              'context' => array(
+                $site->get('name'),
+                var_export($updatedb, 1),
+                var_export($xoption, 1)
+              ),
+              'exit' => false,
             )
           );
           if (!$confirmed) {
@@ -423,15 +492,17 @@ class SitesCommand extends TerminusCommand {
   /**
    * A helper function for getting/prompting for the site create options.
    *
-   * @param [array] $assoc_args Arguments from command
-   * @return [array] $options
+   * @param array $assoc_args Arguments from command
+   * @return array
    */
   private function getSiteCreateOptions($assoc_args) {
     $options          = array();
     $options['label'] = Input::string(
-      $assoc_args,
-      'label',
-      'Human-readable label for the site'
+      array(
+        'args'    => $assoc_args,
+        'key'     => 'label',
+        'message' => 'Human-readable label for the site',
+      )
     );
     $suggested_name   = Utils\sanitizeName($options['label']);
 
@@ -447,14 +518,18 @@ class SitesCommand extends TerminusCommand {
       $message .= " (if left blank will be $suggested_name)";
 
       $options['name'] = Input::string(
-        $assoc_args,
-        'site',
-        $message,
-        $suggested_name
+        array(
+          'args'    => $assoc_args,
+          'key'     => 'site',
+          'message' => $message,
+          'deafult' => $suggested_name,
+        )
       );
     }
     if (isset($assoc_args['org'])) {
-      $options['organization_id'] = Input::orgid($assoc_args, 'org', false);
+      $options['organization_id'] = Input::orgId(
+        array('args' => $assoc_args, 'default' => false)
+      );
     }
     return $options;
   }

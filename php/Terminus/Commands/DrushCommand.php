@@ -3,22 +3,21 @@
 namespace Terminus\Commands;
 
 use Terminus;
-use Terminus\Dispatcher;
-use Terminus\Utils;
 use Terminus\Commands\CommandWithSSH;
-use Terminus\Models\Collections\Sites;
-use Terminus\Helpers\Input;
 
 class DrushCommand extends CommandWithSSH {
   /**
-   * Name of client that command will be run on server via
+   * {@inheritdoc}
    */
   protected $client = 'Drush';
 
   /**
-   * A hash of commands which do not work in Terminus
-   * The key is the drush command
-   * The value is the Terminus equivalent, blank if DNE
+   * {@inheritdoc}
+   */
+  protected $command = 'drush';
+
+  /**
+   * {@inheritdoc}
    */
   protected $unavailable_commands = array(
     'sql-connect' => 'site connection-info --field=mysql_connection',
@@ -29,68 +28,25 @@ class DrushCommand extends CommandWithSSH {
    * Invoke `drush` commands on a Pantheon development site
    *
    * <commands>...
-   * : The Drush commands you intend to run.
-   *
-   * [--<flag>=<value>]
-   * : Additional Drush flag(s) to pass in to the command.
+   * : The Drush command you intend to run with its arguments, in quotes
    *
    * [--site=<site>]
-   * : The name (DNS shortname) of your site on Pantheon.
+   * : The name (DNS shortname) of your site on Pantheon
    *
    * [--env=<environment>]
    * : Your Pantheon environment. Default: dev
    *
    */
   public function __invoke($args, $assoc_args) {
-    $command = implode($args, ' ');
-    $this->checkCommand($command);
+    $elements = $this->getElements($args, $assoc_args);
 
-    $sites = new Sites();
-    $assoc_args['site'] = Input::sitename($assoc_args);
-    $site = $sites->get($assoc_args['site']);
-    if (!$site) {
-      $this->failure('Command could not be completed. Unknown site specified.');
-    }
-    $assoc_args['env'] = $environment = Input::env(
-      array('args' => $assoc_args, 'site' => $site)
-    );
-    $server = $this->getAppserverInfo(
-      array('site' => $site->get('id'), 'environment' => $environment)
-    );
-
-    // Sanitize assoc args so we don't try to pass our own flags.
-    if (isset($assoc_args['site'])) {
-      unset($assoc_args['site']);
-    }
-    if (isset($assoc_args['env'])) {
-      unset($assoc_args['env']);
-    }
-
-    // Create user-friendly output
-    $flags = '';
-    foreach ($assoc_args as $k => $v) {
-      if (isset($v) && (string)$v != '') {
-        $flags .= "--$k=$v ";
-      } else {
-        $flags .= "--$k ";
-      }
-    }
     if (in_array(
       Terminus::getConfig('format'),
       array('bash', 'json', 'silent')
     )) {
-      $assoc_args['pipe'] = 1;
+      $elements['command'] .= ' --pipe';
     }
-    $this->log()->info(
-      "Running drush {cmd} {flags} on {site}-{env}",
-      array(
-        'cmd' => $command,
-        'flags' => $flags,
-        'site' => $site->get('name'),
-        'env' => $environment
-      )
-    );
-    $result = $this->sendCommand($server, 'drush', $args, $assoc_args);
+    $result = $this->sendCommand($elements);
     if (Terminus::getConfig('format') != 'normal') {
       $this->output()->outputRecordList($result);
     }

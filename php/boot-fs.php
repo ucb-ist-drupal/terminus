@@ -9,7 +9,7 @@ if (PHP_SAPI != 'cli') {
   die(1);
 }
 
-$min_version = '5.5.0';
+$min_version = '5.5.9';
 
 if (version_compare(PHP_VERSION, $min_version, '<')) {
   printf(
@@ -22,4 +22,4 @@ if (version_compare(PHP_VERSION, $min_version, '<')) {
 
 define('TERMINUS_ROOT', dirname(__DIR__));
 
-include TERMINUS_ROOT . '/php/terminus.php';
+include TERMINUS_ROOT . '/php/boot-cl.php';

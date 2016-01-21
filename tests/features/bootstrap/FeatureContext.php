@@ -125,7 +125,7 @@ class FeatureContext implements Context {
     * @return [void]
     */
   public function iActivateTheDrupalSite($site) {
-    $instruments = $this->iRun("terminus drush site-install -y --site=$site");
+    $instruments = $this->iRun("terminus drush --command='site-install -y' --site=$site");
   }
 
   /**
@@ -444,7 +444,7 @@ class FeatureContext implements Context {
    * @return [void]
    */
   public function iInstallTheModuleTo($module, $site) {
-    $this->iRun("terminus drush dl $module -y --site=$site --env=dev");
+    $this->iRun("terminus drush --command='dl $module -y' --site=$site --env=dev");
   }
 
   /**
@@ -521,16 +521,16 @@ class FeatureContext implements Context {
 
   /**
    * Logs in user
-   * @When /^I log in via refresh token "([^"]*)"$/
-   * @When /^I log in via refresh token$/
+   * @When /^I log in via machine token "([^"]*)"$/
+   * @When /^I log in via machine token$/
    *
-   * @param [string] $token An Auth0 refresh token
+   * @param [string] $token A Pantheon machine token
    * @return [void]
    */
-  public function iLogInViaRefreshToken(
-      $token = '[[refresh_token]]'
+  public function iLogInViaMachineToken(
+      $token = '[[machine_token]]'
   ) {
-    $this->iRun("terminus auth login --refresh=$token");
+    $this->iRun("terminus auth login --machine-token=$token");
   }
 
   /**

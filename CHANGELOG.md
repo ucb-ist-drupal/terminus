@@ -1,7 +1,60 @@
 #Change Log
 All notable changes to this project starting with the 0.6.0 release will be documented in this file. This project adheres to [Semantic Versioning](http://semver.org)
 
-##Master
+## Master
+### Added
+- Added a [Drush alias-generating script](docs/examples/PantheonAliases.php) to the Terminus-as-a-library docmentation examples. (#808)
+- New command `site redis enable` to enable Redis caching. (#813)
+- New command `site redis disable` to disable Redis caching. (#813)
+- New command `site solr enable` to enable Solr indexing. (#814)
+- New command `site solr disable` to disable Solr indexing. (#814)
+- Added `--email=<email>` argument to `auth login` to retireve saved machine tokens. (#825)
+
+### Changed
+- `drush` and `wp` commands now issue a warning to change your connection mode to SFTP if it is in Git mode. (#807)
+- Removed field name in reply of `site info --field=<field_name>`. (#811)
+- `site redis clear` no longer complains of an inability to find hosts. (#813)
+- Machine tokens are now saved in a `~/.terminus/tokens` directory, a sibling to the Terminus cache directory. (#825)
+- The `<email>` in `auth login <email>` will now reuse a saved machine token for the account associated with that email address, if present. (#825)
+- `TERMINUS_USER` will be used to locate a matching saved machine token before user/password login is attempted. (#825)
+- If only one saved token is present, `auth login` will use it when it has no other arguments. (#825)
+- If a `drush` or `wp` command exits with any status except for 0, Terminus now exits with that status. (#827)
+- Removed "Backup URL:" label from the single-record output of `site backups get`. (#828)
+
+### Fixed
+- Fixed bug in Input#orgId. (#812)
+- Fixed error appearing in `organizations sites list` when there are no results. (#812)
+
+### Removed
+- `--session=<session_id>` argument has been removed from `auth login`. (#826)
+- `logInViaSessionToken()` as been removed from Auth. (#826)
+
+## [0.10.1] - 2015-01-12
+### Added
+- `config/constants.yml` file to contain the default constants for Terminus. (#791)
+- Added a `--name=<regex>` filter to `sites list`. Use regex to filter the sites by name. (#802)
+
+### Fixed
+- Fixed missing-variable error on site selection prompt. (#809)
+
+### Changed
+- Moved Terminus::prompt(), Terminus::promptSecret() to Terminus\Helpers\Input. (#768)
+- Removed duplicative Terminus::menu() in favor of Terminus\Helpers\Input::menu. (#768)
+- Moved Terminus::line() to Terminus\Outputters\Outputter. (#768)
+- Removed dev packages from PHAR file. (#774)
+- Updated Symfony to version 3.0.0. Minimum PHP version required to run Terminus is now 5.5.9. (#772)
+- `auth whoami` now returns a user profile rather than their UUID. (#763)
+
+### Fixed
+- Missing creation dates in site data while using organizations site list command will no longer cause errors. (#766)
+- Fixed headers in session token-based login. (#764)
+- `site backups load --element=database` no longer errs upon calling the renamed function "backup". (#767)
+- `site backups get --latest` bug wherein it was returning the oldest backup, rather than the most recent. (#770)
+- `sites aliases` will no longer tell you you have no sites when none of your domains include 'pantheon.io'. (#782)
+- `site tags add` now searches for existing tags before adding another. (#771)
+- `site redis clear` undefined-variable error has been fixed. (#799)
+
+## [0.10.0] - 2015-12-15
 ### Added
 - New command `workflows show` displays details about a workflow (#687)
 - Added back session token-based login. (#693)
@@ -15,6 +68,7 @@ All notable changes to this project starting with the 0.6.0 release will be docu
 - New subcommand `site hostnames lookup --hostname=<hostname>` to look up a site and environment by hostname. WARNING: May take a long time to run. (#729)
 - New flag `--recursive` on `help` command to show the full details of all subcommands. (#730)
 - Environment variable `TERMINUS_SSH_HOST` targets a specific host for `drush` and `wp` commands. (#737)
+- Documentation and examples for the use of Terminus as a library. (#738)
 
 ### Fixed
 - `site backups get` no longer errs when there are no backups. (#690)
@@ -29,6 +83,8 @@ All notable changes to this project starting with the 0.6.0 release will be docu
 ### Changed
 - Extricated the request logic from TerminusCommand class and moved it to the Request class. (#704)
 - Replaced Mustache templates with Twig. (#730)
+- Resolved Terminus base class' and Runner's interfunctionality. Terminus can now be used as a library. (#738)
+- Drush and WP-CLI commands routed through Terminus must now make use of quotes to pass the command and arguments. (#702)
 
 ##[0.9.3] - 2015-11-17
 ### Added

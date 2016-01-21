@@ -5,11 +5,13 @@ namespace Terminus\Commands;
 use Terminus;
 use Terminus\Auth;
 use Terminus\Request;
+use Terminus\Session;
 use Terminus\Utils;
 use Terminus\Commands\TerminusCommand;
 use Terminus\Helpers\Input;
 use Terminus\Exceptions\TerminusException;
 use Terminus\Models\User;
+use Terminus\Models\Workflow;
 use Terminus\Models\Collections\Sites;
 
 /**
@@ -58,6 +60,15 @@ class SiteCommand extends TerminusCommand {
    * [--day]
    * : Day of the week on which to run weekly backups
    *
+   * [--username]
+   * : MySQL username (Used for site backups load --element=db)
+   *
+   * [--password]
+   * : MySQL password (Used for site backups load --element=db)
+   *
+   * [--database]
+   * : MySQL database name (Used for site backups load --element=db)
+   *
    * @subcommand backups
    *
    */
@@ -76,7 +87,7 @@ class SiteCommand extends TerminusCommand {
           break;
       case 'get':
         $url = $this->getBackup($assoc_args);
-        $this->output()->outputValue($url, 'Backup URL');
+        $this->output()->outputValue($url);
           break;
       case 'load':
         $this->loadBackup($assoc_args);
@@ -115,7 +126,9 @@ class SiteCommand extends TerminusCommand {
    * @subcommand clear-cache
    */
   public function clearCache($args, $assoc_args) {
-    $site     = $this->sites->get(Input::sitename($assoc_args));
+    $site     = $this->sites->get(
+      Input::siteName(array('args' => $assoc_args))
+    );
     $env_id   = Input::env(array('args' => $assoc_args, 'site' => $site));
     $workflow = $site->workflows->create(
       'clear_cache',
@@ -149,7 +162,9 @@ class SiteCommand extends TerminusCommand {
    * @subcommand clone-content
    */
   public function cloneContent($args, $assoc_args) {
-    $site     = $this->sites->get(Input::sitename($assoc_args));
+    $site     = $this->sites->get(
+      Input::siteName(array('args' => $assoc_args))
+    );
     $from_env = $site->environments->get(
       Input::env(
         array(
@@ -183,13 +198,16 @@ class SiteCommand extends TerminusCommand {
       $append[] = 'FILES';
     }
     $append  = implode(' and ', $append);
-    $confirm = sprintf(
-      "Are you sure?\n\tClone from %s to %s\n\tInclude: %s\n",
-      strtoupper($from_env->getName()),
-      strtoupper($to_env),
-      $append
+    Input::confirm(
+      array(
+        'message' => "Are you sure?\n\tClone from %s to %s\n\tInclude: %s\n",
+        'context' => array(
+          strtoupper($from_env->getName()),
+          strtoupper($to_env),
+          $append
+        )
+      )
     );
-    Terminus::confirm($confirm);
 
     if ($site->environments->get($to_env) == null) {
       $this->failure(
@@ -234,7 +252,9 @@ class SiteCommand extends TerminusCommand {
    */
   public function code($args, $assoc_args) {
     $subcommand = array_shift($args);
-    $site       = $this->sites->get(Input::sitename($assoc_args));
+    $site       = $this->sites->get(
+      Input::siteName(array('args' => $assoc_args))
+    );
     $data       = $headers = array();
     $env        = $site->environments->get(
       Input::env(array('args' => $assoc_args, 'site' => $site))
@@ -269,13 +289,15 @@ class SiteCommand extends TerminusCommand {
         $message = "Commit changes to $count files?";
         if ($count === 0) {
           $message = 'There are no changed files. Commit anyway?';
-          Terminus::confirm($message);
+          Input::confirm(compact('message'));
         }
         $message  = Input::string(
-          $assoc_args,
-          'message',
-          'Please enter a commit message.',
-          'Terminus commit.'
+          array(
+            'args'    => $assoc_args,
+            'key'     => 'message',
+            'message' => 'Please enter a commit message.',
+            'default' => 'Terminus commit.'
+          )
         );
         $workflow = $env->commitChanges($message);
         $workflow->wait();
@@ -330,7 +352,9 @@ class SiteCommand extends TerminusCommand {
    * @subcommand connection-info
    */
   public function connectionInfo($args, $assoc_args) {
-    $site        = $this->sites->get(Input::sitename($assoc_args));
+    $site        = $this->sites->get(
+      Input::siteName(array('args' => $assoc_args))
+    );
     $env_id      = Input::env(array('args' => $assoc_args, 'site' => $site));
     $environment = $site->environments->get($env_id);
     $info        = $environment->connectionInfo();
@@ -360,13 +384,15 @@ class SiteCommand extends TerminusCommand {
    * @subcommand create-env
    */
   public function createEnv($args, $assoc_args) {
-    $site = $this->sites->get(Input::sitename($assoc_args));
+    $site = $this->sites->get(Input::siteName(array('args' => $assoc_args)));
 
     if ((boolean)$site->getFeature('multidev')) {
       if (isset($assoc_args['to-env'])) {
         $to_env_id = $assoc_args['to-env'];
       } else {
-        $to_env_id = Terminus::prompt('Name of new multidev environment');
+        $to_env_id = Input::prompt(
+          array('message' => 'Name of new multidev environment')
+        );
       }
 
       $from_env = $site->environments->get(
@@ -418,8 +444,8 @@ class SiteCommand extends TerminusCommand {
         $cmd = 'start';
           break;
     }
-    $site = $this->sites->get(Input::sitename($assoc_args));
-    $env  = Input::optional('env', $assoc_args);
+    $site = $this->sites->get(Input::siteName(array('args' => $assoc_args)));
+    $env  = Input::optional(array('key' => 'env', 'choices' => $assoc_args));
     if (isset($env) && ($env != null)) {
       $env = '#' . $env;
     }
@@ -431,9 +457,8 @@ class SiteCommand extends TerminusCommand {
     if (isset($assoc_args['print'])) {
       $this->output()->outputValue($url, 'Dashboard URL');
     } else {
-      Terminus::confirm(
-        'Do you want to open your dashboard link in a web browser?'
-      );
+      $message = 'Do you want to open your dashboard link in a web browser?';
+      Input::confirm(compact('message'));
       $command = sprintf('%s %s', $cmd, $url);
       exec($command);
     }
@@ -450,14 +475,17 @@ class SiteCommand extends TerminusCommand {
    * : to skip the confirmations
    */
   public function delete($args, $assoc_args) {
-    $site = $this->sites->get(Input::sitename($assoc_args));
+    $site = $this->sites->get(Input::siteName(array('args' => $assoc_args)));
 
     if (!isset($assoc_args['force']) && (!Terminus::getConfig('yes'))) {
       //If the force option isn't used, we'll ask you some annoying questions
-      Terminus::confirm(
-        sprintf('Are you sure you want to delete %s?', $site->get('name'))
+      Input::confirm(
+        array(
+          'message' => 'Are you sure you want to delete %s?',
+          'context' => $site->get('name')
+        )
       );
-      Terminus::confirm('Are you really sure?');
+      Input::confirm(array('message' => 'Are you really sure?'));
     }
     $this->log()->info(
       'Deleting {site} ...',
@@ -483,7 +511,9 @@ class SiteCommand extends TerminusCommand {
    * @subcommand delete-branch
    */
   public function deleteBranch($args, $assoc_args) {
-    $site          = $this->sites->get(Input::sitename($assoc_args));
+    $site          = $this->sites->get(
+      Input::siteName(array('args' => $assoc_args))
+    );
     $multidev_envs = array_diff(
       $site->environments->ids(),
       array('dev', 'test', 'live')
@@ -497,11 +527,11 @@ class SiteCommand extends TerminusCommand {
       )
     );
 
-    Terminus::confirm(
-      sprintf(
-        'Are you sure you want to delete the "%s" branch from %s?',
-        $branch,
-        $site->get('name')
+    $message = 'Are you sure you want to delete the "%s" branch from %s?';
+    Input::confirm(
+      array(
+        'message' => $message,
+        'context' => array($branch, $site->get('name')),
       )
     );
 
@@ -527,7 +557,9 @@ class SiteCommand extends TerminusCommand {
    * @subcommand delete-env
    */
   public function deleteEnv($args, $assoc_args) {
-    $site          = $this->sites->get(Input::sitename($assoc_args));
+    $site          = $this->sites->get(
+      Input::siteName(array('args' => $assoc_args))
+    );
     $multidev_envs = array_diff(
       $site->environments->ids(),
       array('dev', 'test', 'live')
@@ -544,11 +576,11 @@ class SiteCommand extends TerminusCommand {
       $delete_branch = (boolean)$assoc_args['remove_branch'];
     }
 
-    Terminus::confirm(
-      sprintf(
-        'Are you sure you want to delete the "%s" environment from %s?',
-        $env,
-        $site->get('name')
+    $message = 'Are you sure you want to delete the "%s" environment from %s?';
+    Input::confirm(
+      array(
+        'message' => $message,
+        'context' => array($env, $site->get('name')),
       )
     );
 
@@ -582,7 +614,7 @@ class SiteCommand extends TerminusCommand {
    *
    */
   public function deploy($args, $assoc_args) {
-    $site = $this->sites->get(Input::sitename($assoc_args));
+    $site = $this->sites->get(Input::siteName(array('args' => $assoc_args)));
     $env  = $site->environments->get(
       Input::env(
         array(
@@ -603,9 +635,11 @@ class SiteCommand extends TerminusCommand {
     );
 
     if (!isset($assoc_args['note'])) {
-      $annotation = Terminus::prompt(
-        'Custom note for the deploy log',
-        'Deploy from Terminus 2.0'
+      $annotation = Input::prompt(
+        array(
+          'message' => 'Custom note for the deploy log',
+          'default' => 'Deploy from Terminus 2.0',
+        )
       );
     } else {
       $annotation = $assoc_args['note'];
@@ -647,7 +681,7 @@ class SiteCommand extends TerminusCommand {
    * @subcommand environment-info
    */
   public function environmentInfo($args, $assoc_args) {
-    $site = $this->sites->get(Input::sitename($assoc_args));
+    $site = $this->sites->get(Input::siteName(array('args' => $assoc_args)));
     $env  = $site->environments->get(
       Input::env(array('args' => $assoc_args, 'site' => $site))
     );
@@ -670,7 +704,9 @@ class SiteCommand extends TerminusCommand {
    *
    */
   public function environments($args, $assoc_args) {
-    $site         = $this->sites->get(Input::sitename($assoc_args));
+    $site         = $this->sites->get(
+      Input::siteName(array('args' => $assoc_args))
+    );
     $environments = $site->environments->all();
 
     $data = array();
@@ -731,7 +767,9 @@ class SiteCommand extends TerminusCommand {
   public function hostnames($args, $assoc_args) {
     $action = array_shift($args);
     if ($action != 'lookup') {
-      $site   = $this->sites->get(Input::sitename($assoc_args));
+      $site   = $this->sites->get(
+        Input::siteName(array('args' => $assoc_args))
+      );
       $env    = $site->environments->get(
         Input::env(array('args' => $assoc_args, 'site' => $site))
       );
@@ -770,9 +808,11 @@ class SiteCommand extends TerminusCommand {
       case 'lookup':
         $this->log()->warning('This operation may take a long time to run.');
         $hostname  = Input::string(
-          $assoc_args,
-          'hostname',
-          'Please enter a hostname to look up.'
+          array(
+            'args'    => $assoc_args,
+            'key'     => 'hostname',
+            'message' => 'Please enter a hostname to look up.'
+          )
         );
         $sites    = $this->sites->all();
         $data     = null;
@@ -839,8 +879,14 @@ class SiteCommand extends TerminusCommand {
    * @subcommand import-content
    */
   public function import($args, $assoc_args) {
-    $site = $this->sites->get(Input::sitename($assoc_args));
-    $url  = Input::string($assoc_args, 'url', 'URL of archive to import');
+    $site = $this->sites->get(Input::siteName(array('args' => $assoc_args)));
+    $url  = Input::string(
+      array(
+        'args'    => $assoc_args,
+        'key'     => 'url',
+        'message' => 'URL of archive to import'
+      )
+    );
     if (!$url) {
       $this->logger->error('Please enter a URL.');
     }
@@ -848,9 +894,10 @@ class SiteCommand extends TerminusCommand {
     if (!isset($assoc_args['element'])) {
       $element_options = array('database', 'files');
       $element_key     = Input::menu(
-        $element_options,
-        null,
-        'Which element are you importing?'
+        array(
+          'choices' => $element_options,
+          'message' => 'Which element are you importing?',
+        )
       );
       $element         = $element_options[$element_key];
     } else {
@@ -881,14 +928,14 @@ class SiteCommand extends TerminusCommand {
    * : field to return
    */
   public function info($args, $assoc_args) {
-    $site = $this->sites->get(Input::sitename($assoc_args));
+    $site = $this->sites->get(Input::siteName(array('args' => $assoc_args)));
 
     // Fetch environment data for sftp/git connection info
     $site->environments->all();
 
     if (isset($assoc_args['field'])) {
       $field = $assoc_args['field'];
-      $this->output()->outputValue($site->info($field), $field);
+      $this->output()->outputValue($site->info($field));
     } else {
       $this->output()->outputRecord($site->attributes);
     }
@@ -908,7 +955,7 @@ class SiteCommand extends TerminusCommand {
    * @subcommand init-env
    */
   public function initEnv($args, $assoc_args) {
-    $site = $this->sites->get(Input::sitename($assoc_args));
+    $site = $this->sites->get(Input::siteName(array('args' => $assoc_args)));
     $env  = $site->environments->get(
       Input::env(
         array('args' => $assoc_args, 'choices' => array('test', 'live'))
@@ -952,7 +999,7 @@ class SiteCommand extends TerminusCommand {
    */
   public function lock($args, $assoc_args) {
     $action = array_shift($args);
-    $site   = $this->sites->get(Input::sitename($assoc_args));
+    $site   = $this->sites->get(Input::siteName(array('args' => $assoc_args)));
     $env    = $site->environments->get(
       Input::env(array('args' => $assoc_args, 'site' => $site))
     );
@@ -967,12 +1014,14 @@ class SiteCommand extends TerminusCommand {
           array('site' => $site->get('name'), 'env' => $env->get('id'))
         );
         if (!isset($assoc_args['username'])) {
-          $username = Terminus::prompt('Username for the lock');
+          $username = Input::prompt(array('message' => 'Username for the lock'));
         } else {
           $username = $assoc_args['username'];
         }
         if (!isset($assoc_args['password'])) {
-          $password = Terminus::promptSecret('Password for the lock');
+          $password = Input::promptSecret(
+            array('message' => 'Password for the lock')
+          );
         } else {
           $password = $assoc_args['password'];
         }
@@ -1013,7 +1062,7 @@ class SiteCommand extends TerminusCommand {
    * @subcommand merge-from-dev
    */
   public function mergeFromDev($args, $assoc_args) {
-    $site = $this->sites->get(Input::sitename($assoc_args));
+    $site = $this->sites->get(Input::siteName(array('args' => $assoc_args)));
 
     $multidev_ids = array_map(
       function($env) {
@@ -1051,7 +1100,7 @@ class SiteCommand extends TerminusCommand {
    * @subcommand merge-to-dev
    */
   public function mergeToDev($args, $assoc_args) {
-    $site = $this->sites->get(Input::sitename($assoc_args));
+    $site = $this->sites->get(Input::siteName(array('args' => $assoc_args)));
 
     $multidev_ids = array_map(
       function($env) {
@@ -1098,12 +1147,18 @@ class SiteCommand extends TerminusCommand {
    */
   public function organizations($args, $assoc_args) {
     $action = array_shift($args);
-    $site   = $this->sites->get(Input::sitename($assoc_args));
+    $site   = $this->sites->get(Input::siteName(array('args' => $assoc_args)));
     $data   = array();
     switch ($action) {
       case 'add':
-        $role = Input::optional('role', $assoc_args, 'team_member');
-        $org  = Input::orgname($assoc_args, 'org');
+        $role = Input::optional(
+          array(
+            'key'     => 'role',
+            'choices' => $assoc_args,
+            'default' => 'team_member'
+          )
+        );
+        $org  = Input::orgName(array('args' => $assoc_args));
         if (!$this->isOrgAccessible($org)) {
           $this->failure(
             "Organization is either invalid or you are not a member."
@@ -1113,7 +1168,7 @@ class SiteCommand extends TerminusCommand {
         $workflow->wait();
           break;
       case 'remove':
-        $org = Input::orgid($assoc_args, 'org');
+        $org = Input::orgId(array('args' => $assoc_args));
         if (!$this->isOrgAccessible($org)) {
           $this->failure(
             "Organization is either invalid or you are not a member."
@@ -1176,7 +1231,7 @@ class SiteCommand extends TerminusCommand {
 
     $destination = Utils\destinationIsValid($assoc_args['destination']);
 
-    $site = $this->sites->get(Input::sitename($assoc_args));
+    $site = $this->sites->get(Input::siteName(array('args' => $assoc_args)));
     $env  = Input::env(array('args' => $assoc_args, 'site' => $site));
 
     exec('uname', $output, $ret);
@@ -1211,7 +1266,7 @@ class SiteCommand extends TerminusCommand {
   }
 
   /**
-   * Get New Relic Info for site
+   * Get information on New Relic
    *
    * ## OPTIONS
    *
@@ -1221,7 +1276,7 @@ class SiteCommand extends TerminusCommand {
    * @subcommand new-relic
    */
   public function newRelic($args, $assoc_args) {
-    $site = $this->sites->get(Input::sitename($assoc_args));
+    $site = $this->sites->get(Input::siteName(array('args' => $assoc_args)));
     $data = $site->newRelic();
     if (!empty($data->account)) {
       $this->output()->outputRecord($data->account);
@@ -1241,7 +1296,7 @@ class SiteCommand extends TerminusCommand {
    * @subcommand owner
    */
   public function owner($args, $assoc_args) {
-    $site = $this->sites->get(Input::sitename($assoc_args));
+    $site = $this->sites->get(Input::siteName(array('args' => $assoc_args)));
     $this->output()->outputValue($site->get('owner'), 'Site Owner');
   }
 
@@ -1250,8 +1305,8 @@ class SiteCommand extends TerminusCommand {
    *
    * ## OPTIONS
    *
-   * <clear>
-   * : clear - Clear redis cache on remote server
+   * <enable|disable|clear>
+   * : Options are enable, disable, and clear.
    *
    * [--site=<site>]
    * : site name
@@ -1261,34 +1316,52 @@ class SiteCommand extends TerminusCommand {
    *
    * ## Examples
    *
-   *    terminus site redis clear --site=mikes-wp-test --env=live
+   *    terminus site redis clear --site=behat-tests --env=live
+   *    terminus site redis enable --site=behat-tests
+   *    terminus site redis disable --site=behat-tests
    */
   public function redis($args, $assoc_args) {
     $action = array_shift($args);
-    $site   = $this->sites->get(Input::sitename($assoc_args));
-    if (isset($assoc_args['env'])) {
-      $env = $assoc_args['env'];
+    $site   = $this->sites->get(Input::siteName(['args' => $assoc_args]));
+    if (in_array($site->info('service_level'), ['free', 'basic', 'pro'])) {
+      $this->failure(
+        'You must upgrade to a business or an elite plan to use Redis.'
+      );
     }
     switch ($action) {
+      case 'enable':
+        $redis = $site->enableRedis();
+        if ($redis) {
+          $this->log()->info('Redis enabled. Converging bindings...');
+        }
+          break;
+      case 'disable':
+        $redis       = $site->disableRedis();
+        if ($redis) {
+          $this->log()->info('Redis disabled. Converging bindings...');
+        }
+          break;
       case 'clear':
-        $bindings = $site->bindings('cacheserver');
-        if (empty($bindings)) {
-          $this->failure('Redis cache not enabled');
+        if (isset($assoc_args['env'])) {
+          $environments = [$site->environments->get($assoc_args['env'])];
+        } else {
+          $environments = $site->environments->all();
         }
         $commands = array();
-        foreach ($bindings as $binding) {
-          if (isset($env) && (boolean)$env && $env != $binding->environment) {
-            continue;
+        foreach ($environments as $environment) {
+          $connection_info = $environment->connectionInfo();
+          if (!isset($connection_info['redis_host'])) {
+            $this->failure('Redis cache is not enabled.');
           }
-          $args = array(
-            $binding->environment,
+          $args = [
+            $environment->get('id'),
             $site->get('id'),
-            $binding->environment,
+            $environment->get('id'),
             $site->get('id'),
-            $binding->host,
-            $binding->port,
-            $binding->password
-          );
+            $connection_info['redis_host'],
+            $connection_info['redis_port'],
+            $connection_info['redis_password'],
+          ];
           array_filter(
             $args,
             function($a) {
@@ -1297,13 +1370,15 @@ class SiteCommand extends TerminusCommand {
             }
           );
           $command  = 'ssh -p 2222 %s.%s@appserver.%s.%s.drush.in';
-          $command .= ' "redis-cli -h %s -p %s -a %s flushall"';
-          $commands[$binding->environment] = vsprintf($command, $args);
+          $command .= ' "redis-cli -h %s -p %s -a %s flushall" 2> /dev/null';
+          $commands[$environment->get('id')] = vsprintf($command, $args);
         }
         foreach ($commands as $env => $command) {
-          $this->log()->info('Clearing redis on {env}', array('env' => $env));
+          $this->log()->info('Clearing Redis on {env}.', compact('env'));
           exec($command, $stdout, $return);
-          $this->log()->info($stdout[0]);
+          if (!empty($stdout)) {
+            $this->log()->info($stdout[0]);
+          }
         }
           break;
     }
@@ -1332,7 +1407,7 @@ class SiteCommand extends TerminusCommand {
       $this->failure('You must specify the mode as either sftp or git.');
     }
     $mode = strtolower($assoc_args['mode']);
-    $site = $this->sites->get(Input::sitename($assoc_args));
+    $site = $this->sites->get(Input::siteName(array('args' => $assoc_args)));
     // Only present dev and multidev environments; Test/Live cannot be modified
     $environments = array_diff(
       $site->environments->ids(),
@@ -1393,13 +1468,14 @@ class SiteCommand extends TerminusCommand {
    *  terminus site set-instrument --site=sitename
    */
   public function setInstrument($args, $assoc_args) {
-    $user        = new User();
+    $user        = Session::getUser();
     $instruments = $user->instruments->getMemberList('id', 'label');
     if (!isset($assoc_args['instrument'])) {
       $instrument_id = Input::menu(
-        $instruments,
-        null,
-        'Select a payment instrument'
+        array(
+          'choices' => $instruments,
+          'message' => 'Select a payment instrument',
+        )
       );
     } else {
       $instrument_id = $assoc_args['instrument'];
@@ -1414,7 +1490,7 @@ class SiteCommand extends TerminusCommand {
       );
     }
 
-    $site = $this->sites->get(Input::sitename($assoc_args));
+    $site = $this->sites->get(Input::siteName(array('args' => $assoc_args)));
     if ($instrument_id == 0) {
       $workflow = $site->removeInstrument();
     } else {
@@ -1438,7 +1514,9 @@ class SiteCommand extends TerminusCommand {
    * @subcommand set-owner
    */
   public function setOwner($args, $assoc_args) {
-    $site     = $this->sites->get(Input::sitename($assoc_args));
+    $site     = $this->sites->get(
+      Input::siteName(array('args' => $assoc_args))
+    );
     $workflow = $site->setOwner($assoc_args['set']);
     $workflow->wait();
     $this->workflowOutput($workflow);
@@ -1458,11 +1536,48 @@ class SiteCommand extends TerminusCommand {
    * @subcommand set-service-level
    */
   public function setServiceLevel($args, $assoc_args) {
-    $site  = $this->sites->get(Input::sitename($assoc_args));
+    $site  = $this->sites->get(Input::siteName(array('args' => $assoc_args)));
     $info  = $site->get('service_level');
     $level = $assoc_args['level'];
     $data  = $site->updateServiceLevel($level);
     $this->log()->info("Service level has been updated to '$level'");
+  }
+
+  /**
+   * Enable or disable Solr indexing
+   *
+   * ## OPTIONS
+   *
+   * <enable|disable>
+   * : Options are enable and disable
+   *
+   * [--site=<site>]
+   * : Sitei on which to change Solr
+   *
+   * @subcommand solr
+   */
+  public function solr($args, $assoc_args) {
+    $action = array_shift($args);
+    $site   = $this->sites->get(Input::siteName(['args' => $assoc_args]));
+    if (in_array($site->info('service_level'), ['free', 'basic', 'pro'])) {
+      $this->failure(
+        'You must upgrade to a business or an elite plan to use Solr.'
+      );
+    }
+    switch ($action) {
+      case 'enable':
+        $solr = $site->enableSolr();
+        if ($solr) {
+          $this->log()->info('Solr enabled. Converging bindings...');
+        }
+          break;
+      case 'disable':
+        $solr = $site->disableSolr();
+        if ($solr) {
+          $this->log()->info('Solr disabled. Converging bindings...');
+        }
+          break;
+    }
   }
 
   /**
@@ -1486,13 +1601,19 @@ class SiteCommand extends TerminusCommand {
    */
   public function tags($args, $assoc_args) {
     $action = array_shift($args);
-    $site   = $this->sites->get(Input::sitename($assoc_args));
-    $org    = Input::orgid($assoc_args, 'org');
+    $site   = $this->sites->get(Input::siteName(array('args' => $assoc_args)));
+    $org    = Input::orgId(array('args' => $assoc_args));
 
     if ($site->organizationIsMember($org)) {
       switch ($action) {
         case 'add':
-          $tag      = Input::string($assoc_args, 'tag', 'Enter a tag to add');
+          $tag      = Input::string(
+            [
+              'args'    => $assoc_args,
+              'key'     => 'tag',
+              'message' => 'Enter a tag to add',
+            ]
+          );
           $response = $site->addTag($tag, $org);
 
           $context = array(
@@ -1520,7 +1641,9 @@ class SiteCommand extends TerminusCommand {
           } elseif (!isset($assoc_args['tag'])
             || !in_array($assoc_args['tag'], $tags)
           ) {
-            $tag = $tags[Input::menu($tags, null, 'Select a tag to delete')];
+            $tag = $tags[Input::menu(
+              array('choices' => $tags, 'message' => 'Select a tag to delete')
+            )];
           } else {
             $tag = $assoc_args['tag'];
           }
@@ -1579,13 +1702,13 @@ class SiteCommand extends TerminusCommand {
     if (!empty($args)) {
       $action = array_shift($args);
     }
-    $site = $this->sites->get(Input::sitename($assoc_args));
+    $site = $this->sites->get(Input::siteName(array('args' => $assoc_args)));
     $data = array();
     $team = $site->user_memberships;
     switch($action) {
       case 'add-member':
         if ((boolean)$site->getFeature('change_management')) {
-          $role = Input::role($assoc_args);
+          $role = Input::role(array('args' => $assoc_args));
         } else {
           $role = 'team_member';
         }
@@ -1606,7 +1729,7 @@ class SiteCommand extends TerminusCommand {
           break;
       case 'change-role':
         if ((boolean)$site->getFeature('change_management')) {
-          $role = Input::role($assoc_args);
+          $role = Input::role(array('args' => $assoc_args));
           $user = $team->get($assoc_args['member']);
           if ($user != null) {
             $workflow = $user->setRole($role);
@@ -1654,7 +1777,9 @@ class SiteCommand extends TerminusCommand {
    * @subcommand upstream-info
    */
   public function upstreamInfo($args, $assoc_args) {
-    $site     = $this->sites->get(Input::sitename($assoc_args));
+    $site     = $this->sites->get(
+      Input::siteName(array('args' => $assoc_args))
+    );
     $upstream = $site->get('upstream');
     $upstream_updates   = $site->getUpstreamUpdates();
     $upstream['status'] = 'current';
@@ -1692,7 +1817,9 @@ class SiteCommand extends TerminusCommand {
     if (!empty($args)) {
       $action = array_shift($args);
     }
-    $site     = $this->sites->get(Input::sitename($assoc_args));
+    $site     = $this->sites->get(
+      Input::siteName(array('args' => $assoc_args))
+    );
     $upstream = $site->getUpstreamUpdates();
 
     switch($action) {
@@ -1745,11 +1872,12 @@ class SiteCommand extends TerminusCommand {
             isset($assoc_args['accept-upstream'])
             && $assoc_args['accept-upstream']
           );
-          Terminus::confirm(
-            sprintf(
-              'Are you sure you want to apply the upstream updates to %s-dev',
-              $site->get('name'),
-              $env
+          $message  = 'Are you sure you want to apply the ';
+          $message .= 'upstream updates to %s-dev';
+          Input::confirm(
+            array(
+              'message' => $message,
+              'context' => array($site->get('name'), $env),
             )
           );
           $workflow = $site->applyUpstreamUpdates(
@@ -1783,7 +1911,7 @@ class SiteCommand extends TerminusCommand {
    *  terminus site wake --site='testsite' --env=dev
   */
   public function wake($args, $assoc_args) {
-    $site = $this->sites->get(Input::sitename($assoc_args));
+    $site = $this->sites->get(Input::siteName(array('args' => $assoc_args)));
     $env  = Input::env(array('args' => $assoc_args, 'site' => $site));
     $data = $site->environments->get($env)->wake();
     if (!$data['success']) {
@@ -1814,16 +1942,15 @@ class SiteCommand extends TerminusCommand {
    * : Environment to be wiped
    */
   public function wipe($args, $assoc_args) {
-    $site = $this->sites->get(Input::sitename($assoc_args));
+    $site = $this->sites->get(Input::siteName(array('args' => $assoc_args)));
     $env  = $site->environments->get(
       Input::env(array('args' => $assoc_args, 'site' => $site))
     );
 
-    Terminus::confirm(
-      sprintf(
-        'Are you sure you want to wipe %s-%s?',
-        $site->get('name'),
-        $env->get('id')
+    Input::confirm(
+      array(
+        'message' => 'Are you sure you want to wipe %s-%s?',
+        'context' => array($site->get('name'), $env->get('id')),
       )
     );
 
@@ -1841,11 +1968,13 @@ class SiteCommand extends TerminusCommand {
   /**
    * Cancels an environment's regular backup schedule
    *
-   * @params [array] $assoc_args Parameters and flags from the command line
-   * @return [void]
+   * @param array $assoc_args Parameters and flags from the command line
+   * @return void
    */
-  private function cancelBackupSchedule($assoc_args) {
-    $site     = $this->sites->get(Input::sitename($assoc_args));
+  private function cancelBackupSchedule(array $assoc_args) {
+    $site     = $this->sites->get(
+      Input::siteName(array('args' => $assoc_args))
+    );
     $env      = $site->environments->get(
       Input::env(
         array('args' => $assoc_args, 'choices' => array('dev', 'live'))
@@ -1858,11 +1987,11 @@ class SiteCommand extends TerminusCommand {
   /**
    * Creates a backup
    *
-   * @params [array] $assoc_args Parameters and flags from the command line
-   * @return [Workflow] $workflow
+   * @param array $assoc_args Parameters and flags from the command line
+   * @return Workflow
    */
   private function createBackup($assoc_args) {
-    $site = $this->sites->get(Input::sitename($assoc_args));
+    $site = $this->sites->get(Input::siteName(array('args' => $assoc_args)));
     $env  = $site->environments->get(
       Input::env(array('args' => $assoc_args, 'site' => $site))
     );
@@ -1882,25 +2011,37 @@ class SiteCommand extends TerminusCommand {
   /**
    * Retrieves a single backup or downloads it as requested
    *
-   * @params [array] $assoc_args Parameters and flags from the command line
-   * @return [string] $url->url
+   * @param array $assoc_args Parameters and flags from the command line
+   * @return string
    */
   private function getBackup($assoc_args) {
-    $site = $this->sites->get(Input::sitename($assoc_args));
+    $site = $this->sites->get(Input::siteName(array('args' => $assoc_args)));
     $env  = $site->environments->get(
       Input::env(array('args' => $assoc_args, 'site' => $site))
     );
-    $file = Input::optional('file', $assoc_args, false);
+    $file = Input::optional(
+      array(
+        'key'     => 'file',
+        'choices' => $assoc_args,
+        'default' => false
+      )
+    );
     if ($file) {
       $backup  = $env->backups->getBackupByFileName($file);
       $element = $backup->getElement();
     } else {
       $element = Input::backupElement(array('args' => $assoc_args));
-      $latest  = (boolean)Input::optional('latest', $assoc_args, false);
+      $latest  = (boolean)Input::optional(
+        array(
+          'key'     => 'latest',
+          'choices' => $assoc_args,
+          'default' => false
+        )
+      );
       $backups = $env->backups->getFinishedBackups($element);
 
       if ($latest) {
-        $backup = array_pop($backups);
+        $backup = array_shift($backups);
       } else {
         $context = array(
           'site' => $site->get('name'),
@@ -1934,11 +2075,11 @@ class SiteCommand extends TerminusCommand {
   /**
    * Checks to ensure user can access the given organization
    *
-   * @param [string] $org_id Organization name or UUID
-   * @return [boolean] $is_ok True if this organization is accessible
+   * @param string $org_id Organization name or UUID
+   * @return bool True if this organization is accessible
    */
   private function isOrgAccessible($org_id) {
-    $user  = new User();
+    $user  = Session::getUser();
     $org   = $user->organizations->get($org_id);
     $is_ok = is_object($org);
     return $is_ok;
@@ -1947,14 +2088,16 @@ class SiteCommand extends TerminusCommand {
   /**
    * Lists available backups
    *
-   * @params [array] $assoc_args Parameters and flags from the command line
-   * @return [array] $data Elements as follows:
+   * @params array $assoc_args Parameters and flags from the command line
+   * @return array $data Elements as follows:
    *         [string] file The backup's file name
    *         [string] size The backup file's size
    *         [string] date The datetime of the backup's creation
    */
   private function listBackups($assoc_args) {
-    $site    = $this->sites->get(Input::sitename($assoc_args));
+    $site    = $this->sites->get(
+      Input::siteName(array('args' => $assoc_args))
+    );
     $env     = $site->environments->get(
       Input::env(array('args' => $assoc_args, 'site' => $site))
     );
@@ -1963,7 +2106,13 @@ class SiteCommand extends TerminusCommand {
       $element = Input::backupElement(array('args' => $assoc_args));
     }
     $backups = $env->backups->getFinishedBackups($element);
-    $latest  = (boolean)Input::optional('latest', $assoc_args, false);
+    $latest  = (boolean)Input::optional(
+      array(
+        'key'     => 'latest',
+        'choices' => $assoc_args,
+        'default' => false
+      )
+    );
     if (empty($backups)) {
       $this->log()->warning('No backups found.');
     } else {
@@ -1987,44 +2136,40 @@ class SiteCommand extends TerminusCommand {
   /**
    * Loads a single backup
    *
-   * @params [array] $assoc_args Parameters and flags from the command line
-   * @return [boolean] Always true, else the function has thrown an exception
+   * @params array $assoc_args Parameters and flags from the command line
+   * @return bool Always true, else the function has thrown an exception
    */
   private function loadBackup($assoc_args) {
-    $site = $this->sites->get(Input::sitename($assoc_args));
-    $env  = $site->environments->get(
-      Input::env(array('args' => $assoc_args, 'site' => $site))
-    );
-
     $assoc_args['to']      = '/tmp';
     $assoc_args['element'] = 'database';
     if (isset($assoc_args['database'])) {
       $database = $assoc_args['database'];
     } else {
       $database = escapeshellarg(
-        Terminus::prompt('Name of database to import to')
+        Input::prompt(array('message' =>'Name of database to import to'))
       );
     }
     if (isset($assoc_args['username'])) {
       $username = $assoc_args['username'];
     } else {
-      $username = escapeshellarg(Terminus::prompt('Username'));
+      $username = escapeshellarg(Input::prompt(array('message' =>'Username')));
     }
     if (isset($assoc_args['password'])) {
       $password = $assoc_args['password'];
     } else {
-      $password = escapeshellarg(Terminus::prompt('Password'));
+      $password = Input::promptSecret(
+        array('message' => 'Your MySQL password (input will not be shown)')
+      );
     }
 
-    exec('mysql -e "show databases"', $stdout, $exit);
+    exec('mysql --version', $stdout, $exit);
     if ($exit != 0) {
       $this->failure(
         'MySQL does not appear to be installed on your server.'
       );
     }
 
-    $assoc_args['env'] = $env->get('id');
-    $target = $this->backup(array('get'), $assoc_args);
+    $target = $this->getBackup($assoc_args);
     $target = '/tmp/' . Utils\getFilenameFromUrl($target);
 
     if (!file_exists($target)) {
@@ -2065,11 +2210,13 @@ class SiteCommand extends TerminusCommand {
   /**
    * Sets an environment's regular backup schedule
    *
-   * @params [array] $assoc_args Parameters and flags from the command line
-   * @return [void]
+   * @param array $assoc_args Parameters and flags from the command line
+   * @return void
    */
   private function setBackupSchedule($assoc_args) {
-    $site     = $this->sites->get(Input::sitename($assoc_args));
+    $site     = $this->sites->get(
+      Input::siteName(array('args' => $assoc_args))
+    );
     $env      = $site->environments->get(
       Input::env(
         array('args' => $assoc_args, 'choices' => array('dev', 'live'))
@@ -2083,11 +2230,11 @@ class SiteCommand extends TerminusCommand {
   /**
    * Displays an environment's regular backup schedule
    *
-   * @params [array] $assoc_args Parameters and flags from the command line
-   * @return [void]
+   * @params array $assoc_args Parameters and flags from the command line
+   * @return void
    */
   private function showBackupSchedule($assoc_args) {
-    $site     = $this->sites->get(Input::sitename($assoc_args));
+    $site     = $this->sites->get(Input::siteName(array('args' => $assoc_args)));
     $env      = $site->environments->get(
       Input::env(
         array('args' => $assoc_args, 'choices' => array('dev', 'live'))
