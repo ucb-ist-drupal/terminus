@@ -41,17 +41,41 @@ class Auth {
     $session = Session::instance()->getData();
     $auth    = new Auth();
     if (!$auth->loggedIn()) {
-      if (isset($session->machine_token)) {
-        $auth->logInViaMachineToken($session->machine_token);
+      if ($token = $auth->getOnlySavedToken()
+      ) {
+        $auth->logInViaMachineToken($token);
+      } else if (isset($_SERVER['TERMINUS_MACHINE_TOKEN'])
+        && $token = $_SERVER['TERMINUS_MACHINE_TOKEN']
+      ) {
+        $auth->logInViaMachineToken(compact('token'));
+      } else if (isset($_SERVER['TERMINUS_USER'])
+        && $email = $_SERVER['TERMINUS_USER']
+      ) {
+        $auth->logInViaMachineToken(compact('email'));
       } else {
-        throw new TerminusException(
-          'Please login first with `terminus auth login`',
-          [],
-          1
-        );
+        $message  = 'You are not logged in. Run `auth login` to ';
+        $message .= 'authenticate or `help auth login` for more info.';
+        $auth->logger->warning($message);
+        exit(1);
       }
     }
     return true;
+  }
+
+  /**
+   * Generates the URL string for where to create a machine token
+   *
+   * @return string
+   */
+  public static function getMachineTokenCreationUrl() {
+    $url = sprintf(
+      '%s://%s:%s/machine-token/create?client=terminus&device=%s',
+      TERMINUS_PROTOCOL,
+      TERMINUS_HOST,
+      TERMINUS_PORT,
+      gethostname()
+    );
+    return $url;
   }
 
   /**
@@ -99,6 +123,17 @@ class Auth {
       $token = $args['token'];
     } elseif (isset($args['email'])) {
       $token = $this->tokens_cache->findByEmail($args['email'])['token'];
+      if (!$token) {
+        throw new TerminusException(
+          'No machine token for "{email}" found.',
+          compact('email'),
+          1
+        );
+      }
+      $this->logger->info(
+        'Found a machine token for "{email}".',
+        ['email' => $args['email']]
+      );
     }
     $options = array(
       'headers' => array('Content-type' => 'application/json'),

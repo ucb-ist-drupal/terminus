@@ -7,4 +7,10 @@
 .DS_Store
 *.sw*
 .env
+<<<<<<< HEAD
 .idea
+=======
+.idea
+.vagrant
+Vagrantfile
+>>>>>>> 615bcd2242c7a154d1133a6f2d2324202c22bd27

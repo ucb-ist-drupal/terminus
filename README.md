@@ -2,6 +2,7 @@ Pantheon CLI
 ============
 
 [![Build Status](https://travis-ci.org/pantheon-systems/cli.svg?branch=master)](https://travis-ci.org/pantheon-systems/cli) [![Dependency Status](https://gemnasium.com/pantheon-systems/cli.svg)](https://gemnasium.com/pantheon-systems/cli)
+[![Coverage Status](https://coveralls.io/repos/github/pantheon-systems/cli/badge.svg?branch=master)](https://coveralls.io/github/pantheon-systems/cli?branch=master)
 
 The Pantheon Command Line Interface is a successor to the "Terminus" project, which provides access to the Pantheon Platform via Drush. While Terminus has provided great value (and we're going to keep the name in the product,) we felt that it was important to have a first-class standalone CLI toolkit:
 
@@ -37,7 +38,7 @@ composer require pantheon-systems/cli
 
 Run this in this in your terminal client:
 ```bash
-curl https://github.com/pantheon-systems/cli/releases/download/0.10.1/terminus.phar -L -o /usr/local/bin/terminus && chmod +x /usr/local/bin/terminus
+curl https://github.com/pantheon-systems/cli/releases/download/0.10.2/terminus.phar -L -o /usr/local/bin/terminus && chmod +x /usr/local/bin/terminus
 ```
 ####Installing with Git
 To install with Git and use Terminus HEAD, you should clone this repository and run Terminus directly. If you would like to contribute to the Terminus source, this is the way you should install it. You will require Composer for this installation.

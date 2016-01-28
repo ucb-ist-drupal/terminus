@@ -1,14 +1,16 @@
 #Change Log
 All notable changes to this project starting with the 0.6.0 release will be documented in this file. This project adheres to [Semantic Versioning](http://semver.org)
 
-## Master
+## [0.10.2] - 2016-01-27
 ### Added
 - Added a [Drush alias-generating script](docs/examples/PantheonAliases.php) to the Terminus-as-a-library docmentation examples. (#808)
 - New command `site redis enable` to enable Redis caching. (#813)
 - New command `site redis disable` to disable Redis caching. (#813)
 - New command `site solr enable` to enable Solr indexing. (#814)
 - New command `site solr disable` to disable Solr indexing. (#814)
-- Added `--email=<email>` argument to `auth login` to retireve saved machine tokens. (#825)
+- Added `Environment#getParentEnvironment()`. (#831)
+- Added `Commits` collection and `Commit` model. (#831)
+- Added `machine-token list` and `machine-token delete` commands. (#798)
 
 ### Changed
 - `drush` and `wp` commands now issue a warning to change your connection mode to SFTP if it is in Git mode. (#807)
@@ -20,16 +22,25 @@ All notable changes to this project starting with the 0.6.0 release will be docu
 - If only one saved token is present, `auth login` will use it when it has no other arguments. (#825)
 - If a `drush` or `wp` command exits with any status except for 0, Terminus now exits with that status. (#827)
 - Removed "Backup URL:" label from the single-record output of `site backups get`. (#828)
+- Added machine_token to the error output blacklist. (#840)
+- Status on `workflows list` and `workflows show` now read "running", "succeeded", or "failed". (#850)
+- Renamed Environment#log() to Environment#getCodeLog(). (#831)
+- `site deploy` will exit with status 1 and the message "There is nothing to deploy." if there are no changes to deploy. (#831)
+- When not logged in, the message given now refers the user to create a machine token in order to log in. (#790)
 
 ### Fixed
 - Fixed bug in Input#orgId. (#812)
 - Fixed error appearing in `organizations sites list` when there are no results. (#812)
+- Fixed missing-variable error in Request#request which appeared when attempting to sanitize error messages. (#835) 
+- Fixed log-in admonition if a machine token, TERMINUS_USER, or TEMRINUS_MACHINE_TOKEN are present. (#849)
+- Fixed erroneous, old `--[no-]format` tag listing in `help`, replacing it with current `--format=<json|bash|silent>` option. (#854)
 
 ### Removed
 - `--session=<session_id>` argument has been removed from `auth login`. (#826)
-- `logInViaSessionToken()` as been removed from Auth. (#826)
+- `logInViaSessionToken()` has been removed from `Auth`. (#826)
+- `log()` has been removed from `Environment`. Use new commits property (contains Commits collection) instead. (#831)
 
-## [0.10.1] - 2015-01-12
+## [0.10.1] - 2016-01-12
 ### Added
 - `config/constants.yml` file to contain the default constants for Terminus. (#791)
 - Added a `--name=<regex>` filter to `sites list`. Use regex to filter the sites by name. (#802)
