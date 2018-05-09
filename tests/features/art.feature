@@ -17,12 +17,10 @@ Feature: ASCII Art display
     Then I should get: "\"
 
   Scenario: Display random art
-    When I run "terminus art"
-    Then I should get one of the following: "\, .+., .., ............."
+    When I run "terminus art random"
+    Then I should get one of the following: ">\/7, +?????????=., .xWWXo;;;;;,'., ......''......, (( )), Hello World!"
 
   Scenario: Fail to display non-existent artwork
     When I run "terminus art invalid"
-    Then I should get:
-    """
-    There is no source for the requested "invalid" artwork.
-    """
+    Then I should get: ""
+    And I should get: "There is no source for the requested invalid artwork"

@@ -1,14 +1,14 @@
-Feature: Running Drush commands
-  In order to use Drush
-  As a user with a Drupal site
-  I need to be able to send commands to Pantheon through Drush.
+Feature: Running Drush Commands on a Drupal Site
+  In order to interact with Drupal without configuring Pantheon site aliases
+  As a Terminus user
+  I want the ability to run arbitrary drush commands in terminus
 
-  @vcr drush_unavailable
-  Scenario: Running a command that is not available via Terminus
+  Background: I am authenticated and have a site named [[test_site_name]]
     Given I am authenticated
-    And a site named "[[test_site_name]]"
-    When I run "terminus drush 'sql-connect' --site=[[test_site_name]] --env=dev"
-    Then I should get:
-    """
-    sql-connect is not available via Terminus. Please run it via Drush, or you can use `terminus site connection-info --field=mysql_connection` to complete the same task.
-    """
+    And a site named: [[test_site_name]]
+
+  @vcr drush.yml
+  Scenario: Running a simple drush command
+    When I run: terminus drush [[test_site_name]].dev -- version
+    Then I should get: "Terminus is in test mode"
+    And I should get: "drush version"
