@@ -7,13 +7,13 @@
   "minimum-stability": "dev",
   "prefer-stable": true,
   "require": {
-    "php": ">=5.5.9",
+    "php": ">=5.5.38",
     "composer/semver": "^1.4",
     "consolidation/output-formatters": "^3.2",
     "consolidation/robo": "^1.1.0",
     "guzzlehttp/guzzle": "^6.2",
     "psy/psysh": "^0.8",
-    "symfony/console": "^3.3",
+    "symfony/console": "3.4.4",
     "symfony/finder": "~2.7|^3.2",
     "symfony/process": "~2.7|^3.2",
     "symfony/yaml": "~2.1|^3.2"
@@ -57,7 +57,7 @@
     "preferred-install": "dist",
     "sort-packages": true,
     "platform": {
-      "php": "5.5.9"
+      "php": "5.5.38"
     }
   },
   "extra": {

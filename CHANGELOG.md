@@ -1,6 +1,22 @@
 # Change Log
 All notable changes to this project will be documented in this file. This project adheres to [Semantic Versioning](http://semver.org)
 
+## MASTER
+
+## 1.9.0 - 2018-09-11
+### Added
+- Added a `hide_git_mode_warning` option to disable the warning presented when users run Drush or WP-CLI commands on Pantheon sites that are in git mode.  (#1882)
+
+### Fixed
+- Prevent spurious dependency validation failures with Terminus plugins that have `dev` components named in their composer.lock file that have not been installed. (#1880)
+- Removed the prompt displayed when running Drush or WP-CLI commands on a Pantheon server to avoid locking up auotmation scripts. (#1881)
+- Set minimum PHP version to 5.5.38; some earlier versions of PHP 5.5 do not work with Terminus. (#1875)
+- Fixed php warning when ssh key is missing its comment field. (#1843)
+
+## 1.8.1 - 2018-06-08
+### Fixed
+- Fixed bug wherein messages that are passed in as arrays to TerminusException cause failure. (#1863)
+
 ## 1.8.0 - 2018-03-29
 ### Added
 - `alpha:env:metrics` command has been added. (#1835)
