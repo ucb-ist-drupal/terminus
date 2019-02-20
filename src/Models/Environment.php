@@ -13,21 +13,23 @@ use Pantheon\Terminus\Collections\Workflows;
 use Pantheon\Terminus\Helpers\LocalMachineHelper;
 use Pantheon\Terminus\Friends\SiteInterface;
 use Pantheon\Terminus\Friends\SiteTrait;
-use Robo\Common\ConfigAwareTrait;
-use Robo\Contract\ConfigAwareInterface;
 use Pantheon\Terminus\Exceptions\TerminusException;
 
 /**
  * Class Environment
  * @package Pantheon\Terminus\Models
  */
-class Environment extends TerminusModel implements ConfigAwareInterface, ContainerAwareInterface, SiteInterface
+class Environment extends TerminusModel implements ContainerAwareInterface, SiteInterface
 {
     use ContainerAwareTrait;
-    use ConfigAwareTrait;
     use SiteTrait;
 
     const PRETTY_NAME = 'environment';
+
+    /**
+     * @var array
+     */
+    public static $date_attributes = ['created',];
     /**
      * @var string
      */
@@ -107,22 +109,26 @@ class Environment extends TerminusModel implements ConfigAwareInterface, Contain
      * Changes connection mode
      *
      * @param string $value Connection mode, "git" or "sftp"
-     * @return Workflow|string
+     * @return Workflow
+     * @throws TerminusException Thrown when the requested or the mode is already set or is not either "git" or "sftp".
      */
-    public function changeConnectionMode($value)
+    public function changeConnectionMode($mode)
     {
-        $current_mode = $this->serialize()['connection_mode'];
-        if ($value == $current_mode) {
-            $reply = "The connection mode is already set to $value.";
-            return $reply;
+        if ($mode === $this->get('connection_mode')) {
+            throw new TerminusException(
+                'The connection mode is already set to {mode}.',
+                compact('mode')
+            );
         }
-        switch ($value) {
+        switch ($mode) {
             case 'git':
                 $workflow_name = 'enable_git_mode';
                 break;
             case 'sftp':
                 $workflow_name = 'enable_on_server_development';
                 break;
+            default:
+                throw new TerminusException('You must specify the mode as either sftp or git.');
         }
 
         return $this->getWorkflows()->create($workflow_name);
@@ -141,24 +147,30 @@ class Environment extends TerminusModel implements ConfigAwareInterface, Contain
     /**
      * Clones database from this environment to another
      *
-     * @param string $from_env Name of the environment to clone
+     * @param Environment $from_env An object representing the environment to clone
+     * @param array $options Options to be sent to the API
+     *    boolean clear_cache Whether or not to clear caches
+     *    boolean updatedb Update the Drupal database
      * @return Workflow
      */
-    public function cloneDatabase($from_env)
+    public function cloneDatabase(Environment $from_env, array $options = [])
     {
-        $params = ['from_environment' => $from_env,];
+        if (isset($options['updatedb'])) {
+            $options['updatedb'] = (integer)$options['updatedb'];
+        }
+        $params = array_merge(['from_environment' => $from_env->getName(),], $options);
         return $this->getWorkflows()->create('clone_database', compact('params'));
     }
 
     /**
      * Clones files from this environment to another
      *
-     * @param string $from_env Name of the environment to clone
+     * @param Environment $from_env An object representing the environment to clone
      * @return Workflow
      */
-    public function cloneFiles($from_env)
+    public function cloneFiles(Environment $from_env)
     {
-        $params = ['from_environment' => $from_env,];
+        $params = ['from_environment' => $from_env->getName(),];
         return $this->getWorkflows()->create('clone_files', compact('params'));
     }
 
@@ -576,6 +588,16 @@ class Environment extends TerminusModel implements ConfigAwareInterface, Contain
     }
 
     /**
+     * Determines whether there is uncommitted code on the environment.
+     *
+     * @return bool
+     */
+    public function hasUncommittedChanges()
+    {
+        return ($this->get('connection_mode') === 'sftp') && (count((array)$this->get('diffstat')) !== 0);
+    }
+
+    /**
      * Imports a database archive
      *
      * @param string $url URL to import data from
@@ -741,11 +763,11 @@ class Environment extends TerminusModel implements ConfigAwareInterface, Contain
     {
         return [
             'id' => $this->id,
-            'created' => date($this->getConfig()->get('date_format'), $this->get('environment_created')),
+            'created' => $this->get('environment_created'),
             'domain' => $this->domain(),
-            'onserverdev' => $this->get('on_server_development') ? 'true' : 'false',
-            'locked' => $this->getLock()->isLocked() ? 'true' : 'false',
-            'initialized' => $this->isInitialized() ? 'true' : 'false',
+            'onserverdev' => $this->get('on_server_development'),
+            'locked' => $this->getLock()->isLocked(),
+            'initialized' => $this->isInitialized(),
             'connection_mode' => $this->get('connection_mode'),
             'php_version' => $this->getPHPVersion(),
         ];

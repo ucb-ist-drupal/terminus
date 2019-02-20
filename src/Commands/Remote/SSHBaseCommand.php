@@ -2,15 +2,15 @@
 
 namespace Pantheon\Terminus\Commands\Remote;
 
-use League\Container\ContainerAwareInterface;
-use League\Container\ContainerAwareTrait;
 use Pantheon\Terminus\Commands\TerminusCommand;
+use Pantheon\Terminus\Exceptions\TerminusProcessException;
 use Pantheon\Terminus\Helpers\LocalMachineHelper;
+use Pantheon\Terminus\Models\Environment;
+use Pantheon\Terminus\Models\Site;
 use Pantheon\Terminus\Site\SiteAwareInterface;
 use Pantheon\Terminus\Site\SiteAwareTrait;
-use Pantheon\Terminus\Exceptions\TerminusProcessException;
-use Robo\Common\ConfigAwareTrait;
-use Robo\Contract\ConfigAwareInterface;
+use Symfony\Component\Console\Output\ConsoleOutputInterface;
+use Symfony\Component\Process\Process;
 use Symfony\Component\Process\ProcessUtils;
 
 /**
@@ -18,9 +18,8 @@ use Symfony\Component\Process\ProcessUtils;
  * Base class for Terminus commands that deal with sending SSH commands
  * @package Pantheon\Terminus\Commands\Remote
  */
-abstract class SSHBaseCommand extends TerminusCommand implements ContainerAwareInterface, SiteAwareInterface
+abstract class SSHBaseCommand extends TerminusCommand implements SiteAwareInterface
 {
-    use ContainerAwareTrait;
     use SiteAwareTrait;
 
     /**
@@ -28,13 +27,17 @@ abstract class SSHBaseCommand extends TerminusCommand implements ContainerAwareI
      */
     protected $command = '';
     /**
+     * @var Environment
+     */
+    private $environment;
+    /**
      * @var Site
      */
     private $site;
     /**
-     * @var Environment
+     * @var bool
      */
-    private $environment;
+    protected $progressAllowed;
 
     /**
      * Define the environment and site properties
@@ -47,6 +50,20 @@ abstract class SSHBaseCommand extends TerminusCommand implements ContainerAwareI
     }
 
     /**
+     * progressAllowed sets the field that controls whether a progress bar
+     * may be displayed when a program is executed. If allowed, a progress
+     * bar will be used in tty mode.
+     *
+     * @param type|bool $allowed
+     * @return $this
+     */
+    protected function setProgressAllowed($allowed = true)
+    {
+        $this->progressAllowed = $allowed;
+        return $this;
+    }
+
+    /**
      * Execute the command remotely
      *
      * @param array $command_args
@@ -55,7 +72,7 @@ abstract class SSHBaseCommand extends TerminusCommand implements ContainerAwareI
      */
     protected function executeCommand(array $command_args)
     {
-        $this->validateEnvironment($this->site, $this->environment);
+        $this->validateEnvironment($this->environment);
 
         $command_summary = $this->getCommandSummary($command_args);
         $command_line = $this->getCommandLine($command_args);
@@ -85,19 +102,19 @@ abstract class SSHBaseCommand extends TerminusCommand implements ContainerAwareI
         if ($this->getConfig()->get('test_mode')) {
             return $this->divertForTestMode($ssh_command);
         }
-        return $this->getContainer()->get(LocalMachineHelper::class)->execInteractive(
+        return $this->getContainer()->get(LocalMachineHelper::class)->execute(
             $ssh_command,
-            $this->getOutputCallback()
+            $this->getOutputCallback(),
+            $this->progressAllowed
         );
     }
 
     /**
      * Validates that the environment's connection mode is appropriately set
      *
-     * @param Site $site
      * @param Environment $environment
      */
-    protected function validateEnvironment($site, $environment)
+    protected function validateEnvironment($environment)
     {
         // Only warn in dev / multidev
         if ($environment->isDevelopment()) {
@@ -200,8 +217,14 @@ abstract class SSHBaseCommand extends TerminusCommand implements ContainerAwareI
     {
         if ($this->getContainer()->get(LocalMachineHelper::class)->useTty() === false) {
             $output = $this->output();
-            return function ($type, $buffer) use ($output) {
-                $output->write($buffer);
+            $stderr = $this->stderr();
+
+            return function ($type, $buffer) use ($output, $stderr) {
+                if (Process::ERR === $type) {
+                    $stderr->write($buffer);
+                } else {
+                    $output->write($buffer);
+                }
             };
         }
         return function ($type, $buffer) {

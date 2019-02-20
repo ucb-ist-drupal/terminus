@@ -4,14 +4,13 @@ namespace Pantheon\Terminus;
 
 use Composer\Autoload\ClassLoader;
 use Composer\Semver\Semver;
-use Consolidation\AnnotatedCommand\CommandFileDiscovery;
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Request as HttpRequest;
 use League\Container\ContainerAwareInterface;
 use League\Container\ContainerAwareTrait;
 use Pantheon\Terminus\Collections\SavedTokens;
 use Pantheon\Terminus\Collections\Sites;
-use Pantheon\Terminus\Commands\TerminusCommand;
+use Pantheon\Terminus\Config\ConfigAwareTrait;
 use Pantheon\Terminus\DataStore\FileStore;
 use Pantheon\Terminus\Helpers\LocalMachineHelper;
 use Pantheon\Terminus\Plugins\PluginAutoloadDependencies;
@@ -27,8 +26,7 @@ use Pantheon\Terminus\Update\LatestRelease;
 use Pantheon\Terminus\Update\UpdateChecker;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
-use Robo\Common\ConfigAwareTrait;
-use Robo\Config;
+use Robo\Config\Config;
 use Robo\Contract\ConfigAwareInterface;
 use Robo\Robo;
 use Robo\Runner as RoboRunner;
@@ -37,7 +35,6 @@ use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\Finder\Finder;
 use VCR\VCR;
 
 /**
@@ -62,7 +59,7 @@ class Terminus implements ConfigAwareInterface, ContainerAwareInterface, LoggerA
     /**
      * Object constructor
      *
-     * @param \Robo\Config $config
+     * @param \Robo\Config\Config $config
      * @param \Symfony\Component\Console\Input\InputInterface $input
      * @param \Symfony\Component\Console\Output\OutputInterface $output
      */
@@ -78,6 +75,8 @@ class Terminus implements ConfigAwareInterface, ContainerAwareInterface, LoggerA
 
         $this->configureContainer();
 
+        $this->setLogger($container->get('logger'));
+
         $this->addBuiltInCommandsAndHooks();
         $this->addPluginsCommandsAndHooks();
 
@@ -88,8 +87,6 @@ class Terminus implements ConfigAwareInterface, ContainerAwareInterface, LoggerA
 
         $this->runner = new RoboRunner();
         $this->runner->setContainer($container);
-
-        $this->setLogger($container->get('logger'));
 
         date_default_timezone_set($config->get('time_zone'));
         setlocale(LC_MONETARY, $config->get('monetary_locale'));
@@ -111,7 +108,7 @@ class Terminus implements ConfigAwareInterface, ContainerAwareInterface, LoggerA
         $status_code = $this->runner->run($input, $output, null, $this->commands);
         if (!empty($cassette) && !empty($mode)) {
             $this->stopVCR();
-        } else {
+        } elseif ($input->isInteractive()) {
             $this->runUpdateChecker();
         }
         return $status_code;

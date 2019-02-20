@@ -154,7 +154,7 @@ class EnvironmentTest extends ModelTestCase
         $this->assertEquals([], $out);
     }
 
-    public function testChangeConnectionMode()
+    public function testChangeConnectionModeToGit()
     {
         $this->setUpWorkflowOperationTest(
             'changeConnectionMode',
@@ -163,7 +163,10 @@ class EnvironmentTest extends ModelTestCase
             null,
             ['id' => 'dev', 'on_server_development' => true]
         );
+    }
 
+    public function testChangeConnectionModeToSFTP()
+    {
         $this->setUpWorkflowOperationTest(
             'changeConnectionMode',
             ['sftp'],
@@ -171,14 +174,26 @@ class EnvironmentTest extends ModelTestCase
             null,
             ['id' => 'dev']
         );
+    }
 
+    public function testChangeConnectionModeToSame()
+    {
         $model = $this->createModel(['id' => 'dev', 'on_server_development' => true,]);
-        $return = $model->changeConnectionMode('sftp');
-        $this->assertEquals('The connection mode is already set to sftp.', $return);
+        $this->setExpectedException(
+            TerminusException::class,
+            'The connection mode is already set to sftp.'
+        );
+        $this->assertNull($model->changeConnectionMode('sftp'));
+    }
 
-        $model = $this->createModel(['id' => 'dev']);
-        $return = $model->changeConnectionMode('git');
-        $this->assertEquals('The connection mode is already set to git.', $return);
+    public function testChangeConnectionModeToInvalid()
+    {
+        $model = $this->createModel(['id' => 'dev', 'on_server_development' => true,]);
+        $this->setExpectedException(
+            TerminusException::class,
+            'You must specify the mode as either sftp or git.'
+        );
+        $this->assertNull($model->changeConnectionMode('doggo'));
     }
 
     public function testClearCache()
@@ -195,15 +210,15 @@ class EnvironmentTest extends ModelTestCase
     {
         $this->setUpWorkflowOperationTest(
             'cloneDatabase',
-            ['stage',],
+            [$this->model,],
             'clone_database',
-            ['from_environment' => 'stage',]
+            ['from_environment' => 'dev',]
         );
         $this->setUpWorkflowOperationTest(
             'cloneDatabase',
-            ['prod',],
+            [$this->model,],
             'clone_database',
-            ['from_environment' => 'prod',]
+            ['from_environment' => 'dev',]
         );
     }
 
@@ -211,15 +226,15 @@ class EnvironmentTest extends ModelTestCase
     {
         $this->setUpWorkflowOperationTest(
             'cloneFiles',
-            ['stage',],
+            [$this->model,],
             'clone_files',
-            ['from_environment' => 'stage',]
+            ['from_environment' => 'dev',]
         );
         $this->setUpWorkflowOperationTest(
             'cloneFiles',
-            ['prod',],
+            [$this->model,],
             'clone_files',
-            ['from_environment' => 'prod',]
+            ['from_environment' => 'dev',]
         );
     }
 
@@ -844,11 +859,41 @@ class EnvironmentTest extends ModelTestCase
         $model->mergeToDev();
     }
 
-    public function testSerialize()
+    /**
+     * Tests the Environment::serialize() function when the environment is in Git mode
+     */
+    public function testSerializeGitMode()
     {
-        $this->config->method('get')->with('date_format')->willReturn('Y-m-d');
-        $this->configSet(['date_format' => 'Y-m-d']);
+        $info = [
+            'id' => 'dev',
+            'environment_created' => '1479413982',
+            'on_server_development' => false,
+            'php_version' => '70',
+            'dns_zone' => 'example.com',
+        ];
+        $expected = [
+            'id' => 'dev',
+            'created' => '1479413982',
+            'domain' => 'dev-abc.example.com',
+            'onserverdev' => false,
+            'locked' => false,
+            'initialized' => true,
+            'connection_mode' => 'git',
+            'php_version' => '7.0',
+        ];
+        $this->lock->method('isLocked')->willReturn(false);
+        $this->configSet(['date_format' => 'Y-m-d',]);
 
+        $model = $this->createModel($info);
+        $actual = $model->serialize();
+        $this->assertEquals($expected, $actual);
+    }
+
+    /**
+     * Tests the Environment::serialize() function when the environment is in SFTP mode
+     */
+    public function testSerializeSFTPMode()
+    {
         $info = [
             'id' => 'dev',
             'environment_created' => '1479413982',
@@ -856,24 +901,19 @@ class EnvironmentTest extends ModelTestCase
             'php_version' => '70',
             'dns_zone' => 'example.com',
         ];
-        $this->lock->method('isLocked')->willReturn(false);
-        $model = $this->createModel($info);
-        $actual = $model->serialize();
         $expected = [
             'id' => 'dev',
-            'created' => '2016-11-17',
+            'created' => '1479413982',
             'domain' => 'dev-abc.example.com',
-            'onserverdev' => 'true',
-            'locked' => 'false',
-            'initialized' => 'true',
+            'onserverdev' => true,
+            'locked' => false,
+            'initialized' => true,
             'connection_mode' => 'sftp',
             'php_version' => '7.0',
         ];
-        $this->assertEquals($expected, $actual);
+        $this->lock->method('isLocked')->willReturn(false);
+        $this->configSet(['date_format' => 'Y-m-d',]);
 
-        $info['on_server_development'] = false;
-        $expected['onserverdev'] = 'false';
-        $expected['connection_mode'] = 'git';
         $model = $this->createModel($info);
         $actual = $model->serialize();
         $this->assertEquals($expected, $actual);

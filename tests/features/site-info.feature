@@ -17,10 +17,10 @@ Feature: View site information
       Label
       Created
       Framework
+      Region
       Organization
       Plan
       Upstream
-      PHP Version
       Holder Type
       Holder ID
       Owner
@@ -38,10 +38,10 @@ Feature: View site information
       Label
       Created
       Framework
+      Region
       Organization
       Plan
       Upstream
-      PHP Version
       Holder Type
       Holder ID
       Owner

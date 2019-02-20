@@ -115,6 +115,20 @@ class Sites extends APICollection implements SessionAwareInterface
     }
 
     /**
+     * Filters an array of sites by the plan name
+     *
+     * @param string $plan_name Name of the plan to filter by
+     * @return Sites
+     */
+    public function filterByPlanName($plan_name)
+    {
+        $plan_name = strtolower($plan_name);
+        return $this->filter(function ($model) use ($plan_name) {
+            return (strtolower($model->get('plan_name')) === $plan_name);
+        });
+    }
+
+    /**
      * Filters an array of sites by whether the user is an organizational member
      *
      * @param string $owner_uuid UUID of the owning user to filter by
@@ -137,6 +151,20 @@ class Sites extends APICollection implements SessionAwareInterface
     {
         return $this->filter(function ($site) use ($tag) {
             return $site->tags->has($tag);
+        });
+    }
+
+    /**
+     * Filters sites list by upstream
+     *
+     * @param string $upstream_id An upstream to filter by
+     * @return Sites
+     */
+    public function filterByUpstream($upstream_id)
+    {
+        $upstream_id = strtolower($upstream_id);
+        return $this->filter(function ($model) use ($upstream_id) {
+            return in_array($upstream_id, $model->getUpstream()->getReferences());
         });
     }
 

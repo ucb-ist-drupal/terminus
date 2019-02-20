@@ -16,6 +16,10 @@ class LocalMachineHelperTest extends \PHPUnit_Framework_TestCase
      */
     protected $config;
     /**
+     * @var Container
+     */
+    protected $container;
+    /**
      * @var InputInterface
      */
     protected $input;
@@ -66,11 +70,11 @@ class LocalMachineHelperTest extends \PHPUnit_Framework_TestCase
     }
 
     /**
-     * Tests the LocalMachineHelper::execInteractive($command) function
+     * Tests the LocalMachineHelper::execute($command, $callback, $progress) function
      */
-    public function testExecInteractive()
+    public function testExecute()
     {
-        $out = $this->local_machine->execInteractive('ls');
+        $out = $this->local_machine->execute('ls');
         $this->assertEquals(0, $out['exit_code']);
     }
 

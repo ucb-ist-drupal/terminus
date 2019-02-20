@@ -4,12 +4,13 @@ namespace Pantheon\Terminus\Helpers;
 
 use League\Container\ContainerAwareInterface;
 use League\Container\ContainerAwareTrait;
+use Pantheon\Terminus\Config\ConfigAwareTrait;
 use Pantheon\Terminus\Exceptions\TerminusException;
 use Pantheon\Terminus\ProgressBars\ProcessProgressBar;
-use Robo\Common\ConfigAwareTrait;
 use Robo\Common\IO;
 use Robo\Contract\ConfigAwareInterface;
 use Robo\Contract\IOAwareInterface;
+use Symfony\Component\Console\Output\ConsoleOutputInterface;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\Process\Process;
@@ -35,10 +36,10 @@ class LocalMachineHelper implements ConfigAwareInterface, ContainerAwareInterfac
      * @param string $cmd The command to execute
      * @return array The command output and exit_code
      */
-    public function exec($cmd)
+    public function exec($cmd, $callback = null)
     {
         $process = $this->getProcess($cmd);
-        $this->getProgressBar($process)->cycle();
+        $process->run($callback);
         return ['output' => $process->getOutput(), 'exit_code' => $process->getExitCode(),];
     }
 
@@ -47,9 +48,10 @@ class LocalMachineHelper implements ConfigAwareInterface, ContainerAwareInterfac
      *
      * @param string $cmd The command to execute
      * @param callable $callback A function to run while waiting for the process to complete
+     * @param bool $progressIndicatorAllowed Allow the progress bar to be used (if in tty mode only)
      * @return array The command output and exit_code
      */
-    public function execInteractive($cmd, $callback = null)
+    public function execute($cmd, $callback = null, $progressIndicatorAllowed = false)
     {
         $process = $this->getProcess($cmd);
         $useTty = $this->useTty();
@@ -63,7 +65,13 @@ class LocalMachineHelper implements ConfigAwareInterface, ContainerAwareInterfac
             }
         }
         $process->setTty($useTty);
-        $this->getProgressBar($process)->cycle($callback);
+        // Use '$useTty' as a sort of 'isInteractive' indicator.
+        if ($useTty && $progressIndicatorAllowed) {
+            $this->getProgressBar($process)->cycle($callback);
+        } else {
+            $process->start();
+            $process->wait($callback);
+        }
         return ['output' => $process->getOutput(), 'exit_code' => $process->getExitCode(),];
     }
 
