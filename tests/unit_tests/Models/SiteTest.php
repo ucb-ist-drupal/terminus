@@ -191,26 +191,15 @@ class SiteTest extends ModelTestCase
     }
 
     /**
-     * Tests Site::converge()
-     */
-    public function testConverge()
-    {
-        $this->workflows->expects($this->once())
-            ->method('create')
-            ->with($this->equalTo('converge_site'))
-            ->willReturn($this->workflow);
-
-        $workflow = $this->model->converge();
-        $this->assertEquals($workflow, $this->workflow);
-    }
-
-    /**
      * Tests Site::dashboardUrl()
      */
     public function testDashboardUrl()
     {
         $this->configSet(['dashboard_protocol' => 'https', 'dashboard_host' => 'dashboard.pantheon.io',]);
-        $this->assertEquals("https://dashboard.pantheon.io/sites/" . $this->site_data->id, $this->model->dashboardUrl());
+        $this->assertEquals(
+            "https://dashboard.pantheon.io/sites/" . $this->site_data->id,
+            $this->model->dashboardUrl()
+        );
     }
 
     /**

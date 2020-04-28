@@ -246,16 +246,6 @@ class Environment extends TerminusModel implements ContainerAwareInterface, Site
     }
 
     /**
-     * Converges all bindings on a site
-     *
-     * @return array
-     */
-    public function convergeBindings()
-    {
-        return $this->getWorkflows()->create('converge_environment');
-    }
-
-    /**
      * Counts the number of deployable commits
      *
      * @return int
@@ -370,7 +360,7 @@ class Environment extends TerminusModel implements ContainerAwareInterface, Site
     /**
      * Remove a HTTPS certificate from the environment
      *
-     * @return array $workflow
+     * @return Workflow
      *
      * @throws TerminusException
      */
@@ -379,20 +369,8 @@ class Environment extends TerminusModel implements ContainerAwareInterface, Site
         if (!$this->settings('ssl_enabled')) {
             throw new TerminusException('The {env} environment does not have https enabled.', ['env' => $this->id,]);
         }
-        try {
-            $this->request()->request(
-                "sites/{$this->getSite()->id}/environments/{$this->id}/settings",
-                [
-                    'method' => 'put',
-                    'form_params' => [
-                        'ssl_enabled' => false,
-                        'dedicated_ip' => false,
-                    ],
-                ]
-            );
-        } catch (\Exception $e) {
-            throw new TerminusException('There was an problem disabling https for this environment.');
-        }
+
+        return $this->getWorkflows()->create('disable_ssl');
     }
 
     /**
@@ -453,7 +431,10 @@ class Environment extends TerminusModel implements ContainerAwareInterface, Site
     public function getEnvironmentMetrics()
     {
         if (empty($this->environment_metrics)) {
-            $this->environment_metrics = $this->getContainer()->get(EnvironmentMetrics::class, [['environment' => $this,],]);
+            $this->environment_metrics = $this->getContainer()->get(
+                EnvironmentMetrics::class,
+                [['environment' => $this,],]
+            );
         }
         return $this->environment_metrics;
     }
@@ -467,6 +448,14 @@ class Environment extends TerminusModel implements ContainerAwareInterface, Site
             $this->domains = $this->getContainer()->get(Domains::class, [['environment' => $this,],]);
         }
         return $this->domains;
+    }
+
+    /**
+     * @return PrimaryDomain
+     */
+    public function getPrimaryDomainModel()
+    {
+        return $this->getContainer()->get(PrimaryDomain::class, [$this]);
     }
 
     /**
@@ -530,7 +519,9 @@ class Environment extends TerminusModel implements ContainerAwareInterface, Site
      */
     public function getPHPVersion()
     {
-        return !is_null($php_ver = $this->get('php_version')) ? substr($php_ver, 0, 1) . '.' . substr($php_ver, 1) : null;
+        return !is_null($php_ver = $this->get('php_version'))
+            ? substr($php_ver, 0, 1) . '.' . substr($php_ver, 1)
+            : null;
     }
 
     /**
@@ -539,7 +530,10 @@ class Environment extends TerminusModel implements ContainerAwareInterface, Site
     public function getUpstreamStatus()
     {
         if (empty($this->upstream_status)) {
-            $this->upstream_status = $this->getContainer()->get(UpstreamStatus::class, [[], ['environment' => $this,],]);
+            $this->upstream_status = $this->getContainer()->get(
+                UpstreamStatus::class,
+                [[], ['environment' => $this,],]
+            );
         }
         return $this->upstream_status;
     }
@@ -655,9 +649,11 @@ class Environment extends TerminusModel implements ContainerAwareInterface, Site
      * content from previous environment (e.g. test clones dev content, live
      * clones test content.)
      *
+     * @param array $params Parameters for the environment-creation workflow
+     *      string annotation Use to overwrite the default deploy message
      * @return Workflow In-progress workflow
      */
-    public function initializeBindings()
+    public function initializeBindings(array $params = [])
     {
         if ($this->id == 'test') {
             $from_env_id = 'dev';
@@ -665,13 +661,16 @@ class Environment extends TerminusModel implements ContainerAwareInterface, Site
             $from_env_id = 'test';
         }
 
-        $params = [
-            'annotation' => "Create the {$this->id} environment",
-            'clone_database' => ['from_environment' => $from_env_id,],
-            'clone_files' => ['from_environment' => $from_env_id,],
-        ];
+        $parameters = array_merge(
+            [
+                'annotation' => "Create the {$this->id} environment",
+                'clone_database' => ['from_environment' => $from_env_id,],
+                'clone_files' => ['from_environment' => $from_env_id,],
+            ],
+            $params
+        );
 
-        return $this->getWorkflows()->create('create_environment', compact('params'));
+        return $this->getWorkflows()->create('create_environment', ['params' => $parameters,]);
     }
 
     /**

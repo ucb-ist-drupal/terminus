@@ -19,8 +19,6 @@ use Pantheon\Terminus\Models\Workflow;
 use Pantheon\Terminus\Collections\Commits;
 use Pantheon\Terminus\Models\Commit;
 use Pantheon\Terminus\Exceptions\TerminusException;
-use Symfony\Component\Console\Output\Output;
-use Symfony\Component\Process\ProcessUtils;
 
 /**
  * Class EnvironmentTest
@@ -360,15 +358,6 @@ class EnvironmentTest extends ModelTestCase
         $this->assertEquals(array_merge($sftp_expected, $db_expected, $cache_expected, $git_expected), $out);
     }
 
-    public function testConvergeBindings()
-    {
-        $this->setUpWorkflowOperationTest(
-            'convergeBindings',
-            [],
-            'converge_environment'
-        );
-    }
-
     public function testCountDeployableCode()
     {
         $model = $this->getModelWithCommits([]);
@@ -536,53 +525,17 @@ class EnvironmentTest extends ModelTestCase
             ->method('request')
             ->with(
                 'sites/abc/environments/dev/settings',
-                ['method' => 'get',]
-            )
-            ->willReturn(['data' => (object)['ssl_enabled' => true,]]);
-
-        $this->request->expects($this->at(1))
-            ->method('request')
-            ->with(
-                'sites/abc/environments/dev/settings',
-                [
-                    'method' => 'put',
-                    'form_params' => [
-                        'ssl_enabled' => false,
-                        'dedicated_ip' => false,
-                    ],
-                ]
-            )
-            ->willReturn(['data' => 'Ok',]);
-
-        $this->model->disableHttpsCertificate();
-    }
-
-    public function testDisableHttpsCertificateFailed()
-    {
-        $this->request->expects($this->at(0))
-            ->method('request')
-            ->with(
-                'sites/abc/environments/dev/settings',
-                ['method' => 'get',]
+                ['method' => 'get']
             )
             ->willReturn(['data' => (object)['ssl_enabled' => true,],]);
 
-        $this->request->expects($this->at(1))
-            ->method('request')
-            ->with(
-                'sites/abc/environments/dev/settings',
-                [
-                    'method' => 'put',
-                    'form_params' => [
-                        'ssl_enabled' => false,
-                        'dedicated_ip' => false,
-                    ],
-                ]
-            )
-            ->will($this->throwException(new \Exception()));
+        $this->workflows->expects($this->any())
+            ->method('create')
+            ->with('disable_ssl')
+            ->willReturn($this->workflow);
 
-        $this->setExpectedException(TerminusException::class, 'There was an problem disabling https for this environment.');
-        $this->model->disableHttpsCertificate();
+        $workflow = $this->model->disableHttpsCertificate();
+        $this->assertEquals($workflow, $this->workflow);
     }
 
     public function testDisableHttpsCertificateNotEnabled()
@@ -731,27 +684,64 @@ class EnvironmentTest extends ModelTestCase
         );
     }
 
+    /**
+     * Exercises the initializeBindings function
+     */
     public function testInitializeBindings()
     {
+        $live_copies_from = ['from_environment' => 'test',];
+        $test_copies_from = ['from_environment' => 'dev',];
+
+        // Test environment, no message supplied
         $this->setUpWorkflowOperationTest(
             'initializeBindings',
             [],
             'create_environment',
             [
                 'annotation' => 'Create the test environment',
-                'clone_database' => ['from_environment' => 'dev',],
-                'clone_files' => ['from_environment' => 'dev',],
+                'clone_database' => $test_copies_from,
+                'clone_files' => $test_copies_from,
             ],
             ['id' => 'test',]
         );
+
+        // Live environment, no message supplied
         $this->setUpWorkflowOperationTest(
             'initializeBindings',
             [],
             'create_environment',
             [
                 'annotation' => 'Create the live environment',
-                'clone_database' => ['from_environment' => 'test',],
-                'clone_files' => ['from_environment' => 'test',],
+                'clone_database' => $live_copies_from,
+                'clone_files' => $live_copies_from,
+            ],
+            ['id' => 'live',]
+        );
+
+        // Test environment, message supplied
+        $message_for_test = 'Fighting evil by moonlight';
+        $this->setUpWorkflowOperationTest(
+            'initializeBindings',
+            [['annotation' => $message_for_test,],],
+            'create_environment',
+            [
+                'annotation' => $message_for_test,
+                'clone_database' => $test_copies_from,
+                'clone_files' => $test_copies_from,
+            ],
+            ['id' => 'test',]
+        );
+
+        // Live environment, message supplied
+        $message_for_live = 'Winning love by daylight';
+        $this->setUpWorkflowOperationTest(
+            'initializeBindings',
+            [['annotation' => $message_for_live,],],
+            'create_environment',
+            [
+                'annotation' => $message_for_live,
+                'clone_database' => $live_copies_from,
+                'clone_files' => $live_copies_from,
             ],
             ['id' => 'live',]
         );

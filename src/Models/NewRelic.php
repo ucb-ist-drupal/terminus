@@ -23,7 +23,12 @@ class NewRelic extends AddOnModel
     public function disable()
     {
         $site = $this->getSite();
-        return $site->getWorkflows()->create('disable_new_relic_for_site', ['site' => $site->id,]);
+        return $site->getWorkflows()->create('disable_new_relic_for_site', [
+            'site' => $site->id,
+            'params' => [
+                'converge' => true,
+            ],
+        ]);
     }
 
     /**
@@ -34,7 +39,12 @@ class NewRelic extends AddOnModel
     public function enable()
     {
         $site = $this->getSite();
-        return $site->getWorkflows()->create('enable_new_relic_for_site', ['site' => $site->id,]);
+        return $site->getWorkflows()->create('enable_new_relic_for_site', [
+            'site' => $site->id,
+            'params' => [
+                'converge' => true,
+            ],
+        ]);
     }
 
     /**
@@ -51,7 +61,10 @@ class NewRelic extends AddOnModel
         return [
             'name' => $name,
             'status' => $this->get('status'),
-            'subscribed' => date($this->getConfig()->get('date_format'), strtotime($this->get('subscription')->starts_on)),
+            'subscribed' => date(
+                $this->getConfig()->get('date_format'),
+                strtotime($this->get('subscription')->starts_on)
+            ),
             'state' => $this->get('primary admin')->state,
         ];
     }

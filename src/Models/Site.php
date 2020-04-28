@@ -107,16 +107,6 @@ class Site extends TerminusModel implements ContainerAwareInterface, Organizatio
     }
 
     /**
-     * Converges all bindings on a site
-     *
-     * @return Workflow
-     */
-    public function converge()
-    {
-        return $this->getWorkflows()->create('converge_site');
-    }
-
-    /**
      * Provides Pantheon Dashboard URL for this site
      *
      * @return string
@@ -236,7 +226,10 @@ class Site extends TerminusModel implements ContainerAwareInterface, Organizatio
     public function getOrganizationMemberships()
     {
         if (empty($this->user_memberships)) {
-            $this->org_memberships = $this->getContainer()->get(SiteOrganizationMemberships::class, [['site' => $this,],]);
+            $this->org_memberships = $this->getContainer()->get(
+                SiteOrganizationMemberships::class,
+                [['site' => $this,],]
+            );
         }
         return $this->org_memberships;
     }
@@ -383,7 +376,7 @@ class Site extends TerminusModel implements ContainerAwareInterface, Organizatio
             'holder_type' => $this->get('holder_type'),
             'holder_id' => $this->get('holder_id'),
             'owner' => $this->get('owner'),
-            'region' => $this->get('preferred_zone'),
+            'region' => $this->get('preferred_zone_label'),
             'frozen' => $this->isFrozen(),
             'last_frozen_at' => $this->get('last_frozen_at'),
         ];

@@ -187,19 +187,9 @@ class Backup extends TerminusModel implements EnvironmentInterface
             'expiry'    => $this->getExpiry(),
             'initiator' => $this->getInitiator(),
             'url'       => $this->get('archive_url'),
+            'type'      => $this->get('type'),
         ];
     }
-
-    /**
-     * Formats the object into an associative array for output
-     *
-     * @return array Associative array of data for output
-     */
-    public function serializeWithURL()
-    {
-        return array_merge($this->serialize(), ['url' => $this->getUrl()]);
-    }
-
 
     /**
      * @inheritdoc

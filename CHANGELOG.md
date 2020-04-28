@@ -2,6 +2,109 @@
 All notable changes to this project will be documented in this file. This project adheres to [Semantic Versioning](http://semver.org)
 
 ## MASTER
+### Added
+- New option `--no-db` added to `multidev:create` which will skip the duplication of the database from the source environment. (#2050)
+- New option `--no-files` added to `multidev:create` which will skip the duplication of files from the source environment. (#2050)
+- New option `no-db` added to `Environments::create` which will skip the duplication of the database from the source environment. (#2050)
+- New option `no-files` added to `Environments::create` which will skip the duplication of files from the source environment. (#2050)
+- New method `Upstream::hasCode()` returns a bool indicating whether the environment has code or not. (#2056)
+
+### Changed
+- `Request::download($url, $target)` now accepts directories in addition to files as its `$target` parameter. (#2053)
+- The `backup:get` command's `--to` option now accepts directories in addition to files. (#2053)
+- Return type of `Redis::disable()` has changed to a `Workflow` model. (#2055)
+- Return type of `Redis::enable()` has changed to a `Workflow` model. (#2055)
+- Return type of `Solr::disable()` has changed to a `Workflow` model. (#2055)
+- Return type of `Solr::enable()` has changed to a `Workflow` model. (#2055)
+- Return type of `Environment::disableHttpsCertificate()` has changed to a `Workflow` model. (#2055)
+
+### Removed
+- Removed now-redundant `Backup::serializeWithURL()` function. Use `Backup::serialize()` instead. (#2042)
+- Removed obsolete `Environment::convergeBindings()` method. (#2055)
+- Removed obsolete `Site::converge()` method. (#2055)
+
+### Fixed
+- PHP notice is not emitted when using `upstream:updates:status` on an environment without code. (#2056)
+- PHP notice is not emitted when using `UpstreamStatus::hasUpdates()` on an environment without code. (#2056)
+
+## 2.3.0 - 2020-01-10
+### Added
+- New const `TERMINUS_HOST_CERT` added to permit use of SSL certificates while making requests. (#2024)
+
+### Changed
+- Terminus will now load plugin files ending in `Hook.php` in addition to those ending with `Command.php` (#2025)
+- The role parameter in `org:people:add` is now being validated before sending the request. (#2033)
+- The role parameter in `org:people:role` is now being validated before attempting the change. (#2033)
+- The role parameter in `site:team:add` is now being validated before attempting the change. (#2033)
+- The role parameter in `site:team:role` is now being validated before attempting the change. (#2033)
+- `Request::download($url, $target)` now accepts directories in addition to files as its `$target` parameter. (#2053)
+- The `backup:get` command's `--to` option now accepts directories in addition to files. (#2053)
+
+### Deprecated
+- Deprecated the `--cc` option on `env:deploy`. Please use `env:clear-cache` instead. (#2022)
+
+### Fixed
+- PHP Deprecated warnings seen in PHP ≥ 7.4.0 (#2043)
+
+## 2.2.0 - 2019-09-26
+### Added
+- Added `primary` field to the output of `domain:list`. (#2011)
+- Added `domain:primary:add` command to set a domain as primary, causing traffic to redirect to it. (#2011)
+- Added `domain:primary:remove` command to remove a domain's primary designation. (#2011)
+
+## 2.1.0 - 2019-09-03
+### Added
+- Added `--filter` option to `backup:list` command (#1992)
+- Added `--filter` option to `branch:list` command (#1992)
+- Added `--filter` option to `domain:list` command (#1992)
+- Added `--filter` option to `env:list` command (#1992)
+- Added `--filter` option to `multidev:list` command (#1992)
+- Added `--filter` option to `org:list` command (#1992)
+- Added `--filter` option to `org:people:list` command (#1992)
+- Added `--filter` option to `org:site:list` command (#1992)
+- Added `--filter` option to `org:upstream:list` command (#1992)
+- Added `--filter` option to `payment-method:list` command (#1992)
+- Added `--filter` option to `plan:list` command (#1992)
+- Added `--filter` option to `site:list` command (#1992)
+- Added `--filter` option to `site:org:list` command (#1992)
+- Added `--filter` option to `site:team:list` command (#1992)
+- Added `--filter` option to `ssh-key:list` command (#1992)
+- Added `--filter` option to `upstream:list` command (#1992)
+- Added `--filter` option to `upstream:updates:list` command (#1992)
+
+### Deprecated
+- `backup:list` `--element=VALUE` option is deprecated. Use `--filter="type=VALUE"` instead. (#1992)
+- `site:list` `--framework=VALUE` option is deprecated. Use `--filter="framework=VALUE"` instead. (#1992)
+- `site:list` `--name=VALUE` option is deprecated. Use `--filter="name=VALUE"` instead. (#1992)
+- `site:list` `--plan=VALUE` option is deprecated. Use `--filter="plan_name=VALUE"` instead. (#1992)
+- `org:site:list` `--plan=VALUE` option is deprecated. Use `--filter="plan_name=VALUE"` instead. (#1992)
+- `org:site:list` `--tags=VALUE` option is deprecated. Use `--filter="tags=VALUE"` instead. (#1992)
+- `org:upstream:list` `--framework=VALUE` option is deprecated. Use `--filter="framework=VALUE"` instead. (#1992)
+- `org:upstream:list` `--name=VALUE` option is deprecated. Use `--filter="label=VALUE"` instead. (#1992)
+- `upstream:list` `--framework=VALUE` option is deprecated. Use `--filter="framework=VALUE"` instead. (#1992)
+- `upstream:list` `--name=VALUE` option is deprecated. Use `--filter="label=VALUE"` instead. (#1992)
+
+### Obsolete
+- 'pantheon-systems/terminus-aliases-plugin' ignored as load time, as its functionality is now provided in Terminus core. (#1994)
+- PHP 5.5 no longer actively supported, as it is EOL, and no longer testable on Travis.
+
+### Changed
+- `drush:aliases` now produces both Drush 8 and Drush 9 aliases. Wildcard alias records always used (requires Drush 8.3.0 or later). (#1994)
+- `site:info`'s value of the `region` field has been changed to use human-readable region names. (#1985)
+- `site:list`'s value of the `region` field has been changed to use human-readable region names. (#1985)
+- Owner parameter displayed in the success notice of  `owner:set` instead of the user's first and last names. (#2007)
+
+### Removed
+- Users' first and last names removed from the list provided by `site:team:list`. (#2007)
+- Users' first and last names removed from the list provided by `org:people:list`. (#2007)
+
+## 2.0.1 - 2019-04-28
+### Fixed
+- Fixed `site:org:list` so that it no longer ends without returning anything. (#1964)
+- Fixed `env:deploy` so the `--note` option is used when initializing the test or live environments. (#1965)
+- "Deploy from Terminus" is the default message used by `env:deploy` when initializing the test or live environments. (#1965)
+- Fixed issue wherein any list command using datetime filters' first item was a formatted Unix datetime 0. (#1970)
+- Fixed update message when running Terminus PHAR. (#1972)
 
 ## 2.0.0 - 2019-02-20
 ### Added

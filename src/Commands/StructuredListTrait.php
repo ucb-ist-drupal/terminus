@@ -70,7 +70,7 @@ trait StructuredListTrait
             function ($key, $cell_data) {
                 if ($cell_data === true) {
                     return 'true';
-                } else if ($cell_data === false) {
+                } elseif ($cell_data === false) {
                     return 'false';
                 }
                 return $cell_data;
@@ -92,7 +92,7 @@ trait StructuredListTrait
 
         $list->addRendererFunction(
             function ($key, $cell_data) use ($config, $date_attributes) {
-                if (in_array($key, $date_attributes)) {
+                if (!is_numeric($key) && in_array($key, $date_attributes)) {
                     return $config->formatDatetime($cell_data);
                 }
                 return $cell_data;
