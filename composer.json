@@ -8,6 +8,7 @@
   "prefer-stable": true,
   "require": {
     "php": ">=5.5.38",
+    "cweagans/composer-patches": "~1.0",
     "composer/semver": "^1.4",
     "consolidation/comments": "^1.0.2",
     "consolidation/filter-via-dot-access-data": "^1.0",
@@ -65,13 +66,14 @@
   "config": {
     "process-timeout": 3600,
     "optimize-autoloader": true,
-    "preferred-install": "dist",
+    "preferred-install": "source",
     "sort-packages": true,
     "platform": {
       "php": "5.5.38"
     }
   },
   "extra": {
+    "patches-file": "composer.patches.json",
     "branch-alias": {
         "dev-master": "1.x-dev"
     }
