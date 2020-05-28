@@ -438,7 +438,11 @@ class Terminus implements ConfigAwareInterface, ContainerAwareInterface, LoggerA
      */
     private function startVCR(array $options = ['cassette' => 'tmp', 'mode' => 'none',])
     {
-        VCR::configure()->enableRequestMatchers(['method', 'url', 'body',]);
+      if (getenv('WPS_VCR_PATH')) {
+          VCR::configure()->setCassettePath(getenv('WPS_VCR_PATH'));
+          VCR::configure()->enableLibraryHooks(['curl']);
+        }
+        VCR::configure()->enableRequestMatchers(['method', 'url', 'body']);
         VCR::configure()->setMode($options['mode']);
         VCR::turnOn();
         VCR::insertCassette($options['cassette']);
