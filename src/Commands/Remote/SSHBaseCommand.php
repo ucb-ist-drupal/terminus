@@ -99,7 +99,7 @@ abstract class SSHBaseCommand extends TerminusCommand implements SiteAwareInterf
     protected function sendCommandViaSsh($command)
     {
         $ssh_command = $this->getConnectionString() . ' ' . ProcessUtils::escapeArgument($command);
-        if ($this->getConfig()->get('test_mode')) {
+        if ($this->getConfig()->get('test_mode_wps_no_ssh')) {
             return $this->divertForTestMode($ssh_command);
         }
         return $this->getContainer()->get(LocalMachineHelper::class)->execute(
