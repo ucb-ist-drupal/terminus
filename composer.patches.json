@@ -2,8 +2,6 @@
   "patches": {
     "php-vcr/php-vcr": {
       "Implement recording of identical requests with backwards compatibility and separation of concerns": "https://github.com/php-vcr/php-vcr/pull/270.patch",
-      "Fix the parse error on PHP 7.4": "https://github.com/php-vcr/php-vcr/pull/293.patch",
-      "Fix: Notice Trying to access array offset on value of type null when using PHP 7.4": "https://github.com/php-vcr/php-vcr/pull/301.patch",
       "Prevent HttpUtil::parseResponse() from emitting PHP Notice Undefined offset 1": "https://github.com/php-vcr/php-vcr/pull/302.patch"
     }
   }
