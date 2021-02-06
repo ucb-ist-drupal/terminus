@@ -92,7 +92,8 @@ class Environment extends TerminusModel implements ContainerAwareInterface, Site
             $password = $cache_binding->get('password');
             $domain = $cache_binding->get('host');
             $port = $cache_binding->get('port');
-            $url = "redis://pantheon:$password@$domain:$port";
+            $username = $cache_binding->getUsername();
+            $url = "redis://$username:$password@$domain:$port";
             $command = "redis-cli -h $domain -p $port -a $password";
             return [
                 'password' => $password,
@@ -246,16 +247,6 @@ class Environment extends TerminusModel implements ContainerAwareInterface, Site
     }
 
     /**
-     * Converges all bindings on a site
-     *
-     * @return array
-     */
-    public function convergeBindings()
-    {
-        return $this->getWorkflows()->create('converge_environment');
-    }
-
-    /**
      * Counts the number of deployable commits
      *
      * @return int
@@ -298,10 +289,10 @@ class Environment extends TerminusModel implements ContainerAwareInterface, Site
                 $db_binding = array_shift($dbserver_binding);
             } while ($db_binding->get('environment') != $this->id);
 
-            $username = 'pantheon';
             $password = $db_binding->get('password');
             $domain = "dbserver.{$this->id}.{$this->getSite()->id}.drush.in";
             $port = $db_binding->get('port');
+            $username = $db_binding->getUsername();
             $database = 'pantheon';
             $url = "mysql://$username:$password@$domain:$port/$database";
             $command = "mysql -u $username -p$password -h $domain -P $port $database";
@@ -370,7 +361,7 @@ class Environment extends TerminusModel implements ContainerAwareInterface, Site
     /**
      * Remove a HTTPS certificate from the environment
      *
-     * @return array $workflow
+     * @return Workflow
      *
      * @throws TerminusException
      */
@@ -379,20 +370,8 @@ class Environment extends TerminusModel implements ContainerAwareInterface, Site
         if (!$this->settings('ssl_enabled')) {
             throw new TerminusException('The {env} environment does not have https enabled.', ['env' => $this->id,]);
         }
-        try {
-            $this->request()->request(
-                "sites/{$this->getSite()->id}/environments/{$this->id}/settings",
-                [
-                    'method' => 'put',
-                    'form_params' => [
-                        'ssl_enabled' => false,
-                        'dedicated_ip' => false,
-                    ],
-                ]
-            );
-        } catch (\Exception $e) {
-            throw new TerminusException('There was an problem disabling https for this environment.');
-        }
+
+        return $this->getWorkflows()->create('disable_ssl');
     }
 
     /**
@@ -910,5 +889,26 @@ class Environment extends TerminusModel implements ContainerAwareInterface, Site
         $path = "sites/{$this->getSite()->id}/environments/{$this->id}/settings";
         $response = (array)$this->request()->request($path, ['method' => 'get',]);
         return $response['data']->$setting;
+    }
+
+    /**
+     * Checks if the environment has the build step enabled by looking
+     * at the environment variables defined in pantheon.yml.
+     *
+     * @return bool
+     */
+    public function isBuildStepEnabled()
+    {
+        $path = sprintf(
+            'sites/%s/environments/%s/variables',
+            $this->getSite()->id,
+            $this->id
+        );
+        $options = ['method' => 'get',];
+        $response = $this->request()->request($path, $options);
+        if (empty($response['data']) || !isset($response['data']->BUILD_STEP)) {
+            return false;
+        }
+        return $response['data']->BUILD_STEP;
     }
 }

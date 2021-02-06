@@ -1,7 +1,51 @@
 # Change Log
 All notable changes to this project will be documented in this file. This project adheres to [Semantic Versioning](http://semver.org)
 
-## 2.3.0 - 2020-01-09
+## 2.5.0 - 2021-01-19
+### Added
+- `getUsername` added to `Binding` model to retrieve the username for a connection. (#2107)
+
+### Changed
+- `upstream:updates:apply` now applies Composer changes in addition to upstream changes. (#2089)
+- Connection usernames are no longer "pantheon" but derived from API data. (#2107)
+
+## 2.4.1 - 2020-09-08
+### Changed
+- The `DrushRCEditor` class has been renamed to `DrushRcClass`. (#2083)
+- Upstreams can be ID'd by `label`s, `product_id`s and `machine_name`s in addition to `id`s. (#2086)
+
+### Fixed
+- The `DrushRCEditor` class no longer emits deprecation warnings. (#2083)
+- `tag:add` now rejects empty tags. (#2085)
+
+## 2.4.0 - 2020-06-19
+### Added
+- New option `--no-db` added to `multidev:create` which will skip the duplication of the database from the source environment. (#2050)
+- New option `--no-files` added to `multidev:create` which will skip the duplication of files from the source environment. (#2050)
+- New option `no-db` added to `Environments::create` which will skip the duplication of the database from the source environment. (#2050)
+- New option `no-files` added to `Environments::create` which will skip the duplication of files from the source environment. (#2050)
+- New method `Upstream::hasCode()` returns a bool indicating whether the environment has code or not. (#2056)
+
+### Changed
+- `Request::download($url, $target)` now accepts directories in addition to files as its `$target` parameter. (#2053)
+- The `backup:get` command's `--to` option now accepts directories in addition to files. (#2053)
+- Return type of `Redis::disable()` has changed to a `Workflow` model. (#2055)
+- Return type of `Redis::enable()` has changed to a `Workflow` model. (#2055)
+- Return type of `Solr::disable()` has changed to a `Workflow` model. (#2055)
+- Return type of `Solr::enable()` has changed to a `Workflow` model. (#2055)
+- Return type of `Environment::disableHttpsCertificate()` has changed to a `Workflow` model. (#2055)
+
+### Removed
+- Removed now-redundant `Backup::serializeWithURL()` function. Use `Backup::serialize()` instead. (#2042)
+- Removed obsolete `Environment::convergeBindings()` method. (#2055)
+- Removed obsolete `Site::converge()` method. (#2055)
+
+### Fixed
+- Drush script is no longer included when generating Drush aliases. (#2076)
+- PHP notice is not emitted when using `upstream:updates:status` on an environment without code. (#2056)
+- PHP notice is not emitted when using `UpstreamStatus::hasUpdates()` on an environment without code. (#2056)
+
+## 2.3.0 - 2020-01-10
 ### Added
 - New const `TERMINUS_HOST_CERT` added to permit use of SSL certificates while making requests. (#2024)
 
@@ -11,6 +55,8 @@ All notable changes to this project will be documented in this file. This projec
 - The role parameter in `org:people:role` is now being validated before attempting the change. (#2033)
 - The role parameter in `site:team:add` is now being validated before attempting the change. (#2033)
 - The role parameter in `site:team:role` is now being validated before attempting the change. (#2033)
+- `Request::download($url, $target)` now accepts directories in addition to files as its `$target` parameter. (#2053)
+- The `backup:get` command's `--to` option now accepts directories in addition to files. (#2053)
 
 ### Deprecated
 - Deprecated the `--cc` option on `env:deploy`. Please use `env:clear-cache` instead. (#2022)
@@ -25,7 +71,7 @@ All notable changes to this project will be documented in this file. This projec
 - Added `domain:primary:remove` command to remove a domain's primary designation. (#2011)
 
 ## 2.1.0 - 2019-09-03
-### Added 
+### Added
 - Added `--filter` option to `backup:list` command (#1992)
 - Added `--filter` option to `branch:list` command (#1992)
 - Added `--filter` option to `domain:list` command (#1992)
@@ -47,20 +93,20 @@ All notable changes to this project will be documented in this file. This projec
 ### Deprecated
 - `backup:list` `--element=VALUE` option is deprecated. Use `--filter="type=VALUE"` instead. (#1992)
 - `site:list` `--framework=VALUE` option is deprecated. Use `--filter="framework=VALUE"` instead. (#1992)
-- `site:list` `--name=VALUE` option is deprecated. Use `--filter="name=VALUE"` instead. (#1992) 
-- `site:list` `--plan=VALUE` option is deprecated. Use `--filter="plan_name=VALUE"` instead. (#1992) 
+- `site:list` `--name=VALUE` option is deprecated. Use `--filter="name=VALUE"` instead. (#1992)
+- `site:list` `--plan=VALUE` option is deprecated. Use `--filter="plan_name=VALUE"` instead. (#1992)
 - `org:site:list` `--plan=VALUE` option is deprecated. Use `--filter="plan_name=VALUE"` instead. (#1992)
 - `org:site:list` `--tags=VALUE` option is deprecated. Use `--filter="tags=VALUE"` instead. (#1992)
 - `org:upstream:list` `--framework=VALUE` option is deprecated. Use `--filter="framework=VALUE"` instead. (#1992)
-- `org:upstream:list` `--name=VALUE` option is deprecated. Use `--filter="label=VALUE"` instead. (#1992) 
+- `org:upstream:list` `--name=VALUE` option is deprecated. Use `--filter="label=VALUE"` instead. (#1992)
 - `upstream:list` `--framework=VALUE` option is deprecated. Use `--filter="framework=VALUE"` instead. (#1992)
-- `upstream:list` `--name=VALUE` option is deprecated. Use `--filter="label=VALUE"` instead. (#1992) 
+- `upstream:list` `--name=VALUE` option is deprecated. Use `--filter="label=VALUE"` instead. (#1992)
 
 ### Obsolete
 - 'pantheon-systems/terminus-aliases-plugin' ignored as load time, as its functionality is now provided in Terminus core. (#1994)
 - PHP 5.5 no longer actively supported, as it is EOL, and no longer testable on Travis.
 
-### Changed 
+### Changed
 - `drush:aliases` now produces both Drush 8 and Drush 9 aliases. Wildcard alias records always used (requires Drush 8.3.0 or later). (#1994)
 - `site:info`'s value of the `region` field has been changed to use human-readable region names. (#1985)
 - `site:list`'s value of the `region` field has been changed to use human-readable region names. (#1985)
