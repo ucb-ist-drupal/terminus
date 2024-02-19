@@ -11,23 +11,28 @@ use Pantheon\Terminus\Exceptions\TerminusException;
 
 /**
  * Class Workflow
+ *
  * @package Pantheon\Terminus\Models
  */
-class Workflow extends TerminusModel implements ContainerAwareInterface, SessionAwareInterface
+class Workflow extends TerminusModel implements
+    ContainerAwareInterface,
+    SessionAwareInterface
 {
     use ContainerAwareTrait;
     use SessionAwareTrait;
 
-    const PRETTY_NAME = 'workflow';
+    public const PRETTY_NAME = 'workflow';
 
     /**
      * @var array
      */
     public static $date_attributes = ['started_at', 'finished_at',];
+
     /**
      * @var TerminusModel
      */
     private $owner;
+
     /**
      * @var WorkflowOperations
      */
@@ -38,6 +43,7 @@ class Workflow extends TerminusModel implements ContainerAwareInterface, Session
      *
      * @param object $attributes Attributes of this model
      * @param array $options Options with which to configure this model
+     *
      * @return Workflow
      * @throws TerminusException
      */
@@ -59,7 +65,9 @@ class Workflow extends TerminusModel implements ContainerAwareInterface, Session
 
 
     /**
-     * Check on the progress of a workflow. There is no check to prevent API flooding.
+     * Check on the progress of a workflow. There is no check to prevent API
+     * flooding.
+     *
      * @DEPRECATED 2.3.1-dev Will be removed at next major release.
      *  Please use the constituent logic or the WorkflowProcessingTrait
      *
@@ -86,10 +94,10 @@ class Workflow extends TerminusModel implements ContainerAwareInterface, Session
     public function getOperations()
     {
         if (empty($this->workflow_operations)) {
-            $this->workflow_operations = $this->getContainer()->get(
-                WorkflowOperations::class,
-                [['data' => $this->get('operations'),],]
-            );
+            $nickname = \uniqid(__FUNCTION__ . "-");
+            $this->getContainer()->add($nickname, WorkflowOperations::class)
+                ->addArgument(['data' => $this->get('operations')]);
+            $this->workflow_operations = $this->getContainer()->get($nickname);
         }
         return $this->workflow_operations;
     }
@@ -126,6 +134,26 @@ class Workflow extends TerminusModel implements ContainerAwareInterface, Session
     }
 
     /**
+     * Returns "started_at" attribute.
+     *
+     * @return int
+     */
+    public function getStartedAt(): int
+    {
+        return (int)$this->get('started_at');
+    }
+
+    /**
+     * Returns "finished_at" attribute.
+     *
+     * @return int
+     */
+    public function getFinishedAt(): int
+    {
+        return (int)$this->get('finished_at');
+    }
+
+    /**
      * Re-fetches workflow data hydrated with logs
      *
      * @return Workflow
@@ -138,7 +166,8 @@ class Workflow extends TerminusModel implements ContainerAwareInterface, Session
     }
 
     /**
-     * Get the success message of a workflow or throw an exception of the workflow failed.
+     * Get the success message of a workflow or throw an exception of the
+     * workflow failed.
      *
      * @return string The message to output to the user
      * @throws \Pantheon\Terminus\Exceptions\TerminusException
@@ -172,6 +201,16 @@ class Workflow extends TerminusModel implements ContainerAwareInterface, Session
     public function getOwnerObject()
     {
         return $this->owner;
+    }
+
+    /**
+     * Sets the object which owns this workflow
+     *
+     * @param $owner The object that owns this workflow
+     */
+    public function setOwnerObject($owner)
+    {
+        $this->owner = $owner;
     }
 
     /**
@@ -215,7 +254,8 @@ class Workflow extends TerminusModel implements ContainerAwareInterface, Session
      * Returns a list of WorkflowOperations for this workflow
      *
      * @return WorkflowOperation[]
-     * @deprecated 1.5.1-dev Use $this->getOperations->all() for equivalent functionality
+     * @deprecated 1.5.1-dev Use $this->getOperations->all() for equivalent
+     *     functionality
      */
     public function operations()
     {
@@ -244,7 +284,7 @@ class Workflow extends TerminusModel implements ContainerAwareInterface, Session
             'user' => $user,
             'status' => $this->getStatus(),
             'time' => sprintf('%ds', $elapsed_time),
-            'finished_at' => $this->get('finished_at'),
+            'finished_at' => $this->get('finished_at') ?? null,
             'started_at' => $this->get('started_at'),
             'operations' => $this->getOperations()->serialize(),
         ];
@@ -254,6 +294,7 @@ class Workflow extends TerminusModel implements ContainerAwareInterface, Session
      * Determines whether this workflow was created after a given datetime
      *
      * @param string $timestamp
+     *
      * @return boolean
      */
     public function wasCreatedAfter($timestamp)
@@ -265,10 +306,27 @@ class Workflow extends TerminusModel implements ContainerAwareInterface, Session
      * Determines whether this workflow finished after a given datetime
      *
      * @param string $timestamp
+     *
      * @return boolean
      */
     public function wasFinishedAfter($timestamp)
     {
         return $this->get('finished_at') > $timestamp;
+    }
+
+    /**
+     * @return \Pantheon\Terminus\Models\TerminusModel
+     */
+    public function getOwner()
+    {
+        return $this->owner;
+    }
+
+    /**
+     * @param \Pantheon\Terminus\Models\TerminusModel $owner
+     */
+    public function setOwner($owner): void
+    {
+        $this->owner = $owner;
     }
 }

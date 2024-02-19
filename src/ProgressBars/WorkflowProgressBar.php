@@ -30,7 +30,7 @@ class WorkflowProgressBar extends TerminusProgressBar
     {
         $this->workflow = $workflow;
         ProgressBar::setFormatDefinition('custom', ' %current%/%max% [%bar%] %message%');
-        $this->progress_bar = new ProgressBar($output, $this->workflow->get('number_of_tasks'));
+        $this->progress_bar = new ProgressBar($output, $this->workflow->get('number_of_tasks') ?? 3);
         $this->updateActiveMessage();
         $this->progress_bar->setFormat('custom');
         $this->start();
@@ -45,6 +45,19 @@ class WorkflowProgressBar extends TerminusProgressBar
         while ($this->update()) {
             $this->sleep();
         }
+    }
+
+    /**
+     * Sleeps to prevent spamming the API.
+     */
+    protected function sleep()
+    {
+        $retry_interval = $this->getConfig()->get('workflow_polling_delay_ms', 5000);
+        if ($retry_interval < 1000) {
+            // The API will not allow polling faster than once per second.
+            $retry_interval = 1000;
+        }
+        usleep($retry_interval * 1000);
     }
 
     /**
@@ -81,6 +94,6 @@ class WorkflowProgressBar extends TerminusProgressBar
      */
     protected function updateActiveMessage()
     {
-        $this->progress_bar->setMessage($this->workflow->get('active_description'));
+        $this->progress_bar->setMessage($this->workflow->get('active_description') ?? "Working...");
     }
 }

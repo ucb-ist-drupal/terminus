@@ -18,7 +18,7 @@ class ListCommand extends TerminusCommand implements SiteAwareInterface
     use StructuredListTrait;
 
     /**
-     * Displays a list of the site's environments.
+     * Displays a list of the site environments.
      *
      * @authorize
      * @filter-output
@@ -41,7 +41,7 @@ class ListCommand extends TerminusCommand implements SiteAwareInterface
      */
     public function listEnvs($site_id)
     {
-        $site = $this->getSite($site_id);
+        $site = $this->getSiteById($site_id);
         if ($site->isFrozen()) {
             $this->log()->warning('This site is frozen. Its test and live environments are unavailable.');
         }

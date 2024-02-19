@@ -4,19 +4,23 @@ namespace Pantheon\Terminus\Collections;
 
 use League\Container\ContainerAwareInterface;
 use League\Container\ContainerAwareTrait;
+use Pantheon\Terminus\Exceptions\TerminusException;
 use Pantheon\Terminus\Exceptions\TerminusNotFoundException;
 use Pantheon\Terminus\Models\TerminusModel;
 use Pantheon\Terminus\Request\RequestAwareInterface;
 use Pantheon\Terminus\Request\RequestAwareTrait;
+use Psr\Log\LoggerAwareInterface;
+use Psr\Log\LoggerAwareTrait;
 
 /**
  * Class TerminusCollection
  * @package Pantheon\Terminus\Collections
  */
-abstract class TerminusCollection implements ContainerAwareInterface, RequestAwareInterface
+abstract class TerminusCollection implements ContainerAwareInterface, RequestAwareInterface, LoggerAwareInterface
 {
     use ContainerAwareTrait;
     use RequestAwareTrait;
+    use LoggerAwareTrait;
 
     /**
      * @var array
@@ -52,11 +56,18 @@ abstract class TerminusCollection implements ContainerAwareInterface, RequestAwa
      */
     public function add($model_data, array $options = [])
     {
+        if (is_string($model_data)) {
+            throw new TerminusException($model_data);
+        }
         $options = array_merge(
-            ['id' => $model_data->id, 'collection' => $this,],
+            ['id' => $model_data->id, 'collection' => $this],
             $options
         );
-        $model = $this->getContainer()->get($this->collected_class, [$model_data, $options,]);
+        $nickname = \uniqid($model_data->id);
+
+        $this->getContainer()->add($nickname, $this->collected_class)
+            ->addArguments([$model_data, $options]);
+        $model = $this->getContainer()->get($nickname);
         $this->models[$model_data->id] = $model;
         return $model;
     }
@@ -83,6 +94,38 @@ abstract class TerminusCollection implements ContainerAwareInterface, RequestAwa
     public function fetch()
     {
         foreach ($this->getData() as $id => $model_data) {
+            if (!$id && !is_object($model_data)) {
+                // Empty model, just skip it.
+                continue;
+            }
+            if (!is_object($model_data)) {
+                // This should always be an object, however occasionally it is returning as a string
+                // We need more information about what it is and to handle the error
+                $model_data_str = print_r($model_data, true);
+                $error_maxlength = 250;
+                if (is_string($model_data_str) && strlen($model_data_str) > $error_maxlength) {
+                    $model_data_str = substr($model_data_str, 0, $error_maxlength) . ' ...';
+                }
+                $error_message = "Fetch failed {file}:{line} \$model_data expected as object but returned as {type}.";
+                $error_message .= "\nUnexpected value: {model_data_str}";
+                $trace = debug_backtrace();
+                $context = [
+                    'file' => $trace[0]['file'],
+                    'line' => $trace[0]['line'],
+                    'type' => gettype($model_data),
+                    'model_data_str' => $model_data_str
+                ];
+
+                // verbose logging for debugging
+                $this->logger->debug($error_message, $context);
+
+                // less information for more user-facing messages, but a problem has occurred and we're skipping this
+                // item so we should still surface a user-facing message
+                $this->logger->warning("Model data missing for {id}", ['id' => $id,]);
+
+                // skip this item since it lacks useful data
+                continue;
+            }
             if (!isset($model_data->id)) {
                 $model_data->id = $id;
             }
@@ -92,7 +135,7 @@ abstract class TerminusCollection implements ContainerAwareInterface, RequestAwa
     }
 
     /**
-     * Filters the members of this collection
+     * Filters the members of this collectin
      *
      * @param callable $filter Filter function
      */
@@ -124,7 +167,7 @@ abstract class TerminusCollection implements ContainerAwareInterface, RequestAwa
      * @return TerminusModel $this->models[$id]
      * @throws TerminusNotFoundException
      */
-    public function get($id)
+    public function get($id): TerminusModel
     {
         foreach ($this->all() as $member) {
             if (in_array($id, $member->getReferences())) {
@@ -136,8 +179,7 @@ abstract class TerminusCollection implements ContainerAwareInterface, RequestAwa
         $particle = in_array(substr($pretty_name, 0, 1), ['a', 'e', 'i', 'o', 'u',]) ? 'an' : 'a';
         throw new TerminusNotFoundException(
             "Could not find $particle {model} identified by {id}.",
-            ['model' => $pretty_name, 'id' => $id,],
-            1
+            ['model' => $pretty_name, 'id' => $id,]
         );
     }
 
@@ -146,7 +188,7 @@ abstract class TerminusCollection implements ContainerAwareInterface, RequestAwa
      *
      * @return string
      */
-    public function getCollectedClass()
+    public function getCollectedClass(): string
     {
         return $this->collected_class;
     }
@@ -168,6 +210,39 @@ abstract class TerminusCollection implements ContainerAwareInterface, RequestAwa
     public function has($id)
     {
         return !is_null($models = $this->all()) && array_key_exists($id, $models);
+    }
+
+    /**
+     * Determines whether the models contain any object provided a list of IDs
+     *
+     * @param array $ids Ids of object to seek
+     * @return boolean True if object is found, false if it is not
+     */
+    public function containsAny($ids)
+    {
+        $ids = array_flip($ids);
+        return !is_null($models = $this->all()) && !empty(array_intersect_key($ids, $models));
+    }
+
+    /**
+     * Determines whether the models contain all objects provided a list of IDs
+     *
+     * @param array $ids Ids of object to seek
+     * @return boolean True if object is found, false if it is not
+     */
+    public function containsAll($ids)
+    {
+        return !is_null($models = $this->all()) && empty(array_diff($ids, array_keys($models)));
+    }
+
+    /**
+     * Determines whether the models contain no objects.
+     *
+     * @return boolean False if object is found, True if it is not
+     */
+    public function containsNone()
+    {
+        return !is_null($models = $this->all()) && empty($models);
     }
 
     /**
@@ -211,5 +286,19 @@ abstract class TerminusCollection implements ContainerAwareInterface, RequestAwa
     public function setData(array $data = [])
     {
         $this->data = $data;
+    }
+
+    /**
+     * Convert comma-separated string into an array.
+     * @param string $input
+     * @return array
+     */
+    public function splitString(string $input = "")
+    {
+        /**
+         * array_map to trim each item
+         * array_filter to always return an array, even if empty
+         */
+        return array_filter(array_map('trim', explode(',', $input)));
     }
 }

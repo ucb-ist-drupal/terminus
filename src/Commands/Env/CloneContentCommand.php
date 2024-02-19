@@ -12,6 +12,7 @@ use Pantheon\Terminus\Site\SiteAwareTrait;
 
 /**
  * Class CloneContentCommand
+ *
  * @package Pantheon\Terminus\Commands\Env
  */
 class CloneContentCommand extends TerminusCommand implements SiteAwareInterface
@@ -23,6 +24,7 @@ class CloneContentCommand extends TerminusCommand implements SiteAwareInterface
      * @var Environment
      */
     private $source_env;
+
     /**
      * @var Environment
      */
@@ -31,26 +33,47 @@ class CloneContentCommand extends TerminusCommand implements SiteAwareInterface
 
     /**
      * Clones database/files from one environment to another environment.
+     * WordPress sites will search the database for the default domain and
+     * replace it with the target environment's domain unless you specify
+     * a different search/replace string with --search-for and --replace-with.
+     *
+     * IMPORTANT NOTE: if you have a WordPress Multisite installation, you
+     * will need an entry in your pantheon.yml in order to search all the
+     * sites in your install.  See http://pantheon.io/some/link/in/docs.
      *
      * @authorize
      *
      * @command env:clone-content
      *
-     * @param string $site_env Origin site & environment in the format `site-name.env`
+     * @param string $site_env Origin site & environment in the format
+     *     `site-name.env`
      * @param string $target_env Target environment
      * @param array $options
+     *
      * @option bool $cc Whether or not to clear caches
      * @option bool $db-only Only clone database
      * @option bool $files-only Only clone files
      * @option bool $updatedb Update the Drupal database
+     * @option string $from-url URL to search for (WordPress only)
+     * @option string $to-url URL to replace (WordPress only)
      *
      * @throws \Pantheon\Terminus\Exceptions\TerminusException
      *
-     * @usage <site>.<env> <target_env> Clones database and files from <site>'s <env> environment to <target_env> environment.
-     * @usage <site>.<env> <target_env> --cc Clones from <site>'s <env> environment to <target_env> environment and clears the database.
-     * @usage <site>.<env> <target_env> --db-only Clones only the database from <site>'s <env> environment to <target_env> environment.
-     * @usage <site>.<env> <target_env> --files-only Clones only files from <site>'s <env> environment to <target_env> environment.
-     * @usage <site>.<env> <target_env> --updatedb Clones from <site>'s <env> environment to <target_env> environment and updates the Drupal database (if applicable).
+     * @usage <site>.<env> <target_env> Clones database and files from <site>'s
+     *     <env> environment to <target_env> environment.
+     * @usage <site>.<env> <target_env> --cc Clones from <site>'s <env>
+     *     environment to <target_env> environment and clears the cache.
+     * @usage <site>.<env> <target_env> --db-only Clones only the database from
+     *     <site>'s <env> environment to <target_env> environment.
+     * @usage <site>.<env> <target_env> --files-only Clones only files from
+     *     <site>'s <env> environment to <target_env> environment.
+     * @usage <site>.<env> <target_env> --updatedb Clones from <site>'s <env>
+     *     environment to <target_env> environment and updates the Drupal
+     *     database (if applicable).
+     * @usage <site>.<env> <target_env> --from-url=www.example.com
+     *     --to-url=mulitidevenv.example.com (WordPress only) Clones from
+     *     <site>'s <env> environment to <target_env> environment and replaces
+     *     www.example.com with mulitidevenv.example.com in the database.
      */
     public function cloneContent(
         $site_env,
@@ -60,30 +83,40 @@ class CloneContentCommand extends TerminusCommand implements SiteAwareInterface
             'db-only' => false,
             'files-only' => false,
             'updatedb' => false,
+            'from-url' => '',
+            'to-url' => '',
         ]
     ) {
         if (!empty($options['db-only']) && !empty($options['files-only'])) {
-            throw new TerminusException('You cannot specify both --db-only and --files-only');
+            throw new TerminusException(
+                'You cannot specify both --db-only and --files-only'
+            );
         }
 
-        list($site, $this->source_env) = $this->getUnfrozenSiteEnv($site_env);
+        $this->requireSiteIsNotFrozen($site_env);
+        $site = $this->getSiteById($site_env);
+        $this->source_env = $this->getEnv($site_env);
         $this->target_env = $site->getEnvironments()->get($target_env);
 
         if ($this->source_env->id === $target_env) {
-            $this->log()->notice('The clone has been skipped because the source and target environments are the same.');
+            $this->log()->notice(
+                'The clone has been skipped because the source and target environments are the same.'
+            );
             return;
         }
 
         $this->checkForInitialization($this->source_env, 'from');
         $this->checkForInitialization($this->target_env, 'into');
-        if (!$this->confirm(
-            'Are you sure you want to clone content from {from} to {to} on {site}?',
-            [
-                'from' => $this->source_env->getName(),
-                'site' => $site->getName(),
-                'to' => $this->target_env->getName(),
-            ]
-        )) {
+        if (
+            !$this->confirm(
+                'Are you sure you want to clone content from {from} to {to} on {site}?',
+                [
+                    'from' => $this->source_env->getName(),
+                    'site' => $site->getName(),
+                    'to' => $this->target_env->getName(),
+                ]
+            )
+        ) {
             return;
         }
 
@@ -97,19 +130,22 @@ class CloneContentCommand extends TerminusCommand implements SiteAwareInterface
     }
 
     /**
-     * Checks to see whether the indicated environment is initialized and stops the process if it isn't
+     * Checks to see whether the indicated environment is initialized and stops
+     * the process if it isn't
      *
      * @param Environment $env
      * @param string $direction "into" or "from" are recommended.
-     * @throws TerminusException Thrown if the passed-in environment is not initialized
+     *
+     * @throws TerminusException Thrown if the passed-in environment is not
+     *     initialized
      */
     private function checkForInitialization(Environment $env, $direction = '')
     {
         if (!$env->isInitialized()) {
             throw new TerminusException(
                 "{site}'s {env} environment cannot be cloned {direction} because it has not been initialized. "
-                . 'Please run `env:deploy {site}.{env}` to initialize it.',
-                ['direction' => $direction, 'env' => $env->getName(), 'site' => $env->getSite()->getName(),]
+                . 'Please run `env:deploy {env}` to initialize it.',
+                ['direction' => $direction, 'env' => $env]
             );
         }
     }
@@ -127,8 +163,16 @@ class CloneContentCommand extends TerminusCommand implements SiteAwareInterface
             'clear_cache' => $options['cc'],
             'updatedb' => $options['updatedb'],
         ];
+        if ($options['from-url'] != '') {
+            $params['from_url'] = $options['from-url'];
+        }
+        if ($options['to-url'] != '') {
+            $params['to_url'] = $options['to-url'];
+        }
         $this->emitNotice('database');
-        $this->runClone($this->target_env->cloneDatabase($this->source_env, $params));
+        $this->runClone(
+            $this->target_env->cloneDatabase($this->source_env, $params)
+        );
     }
 
     /**
@@ -148,8 +192,11 @@ class CloneContentCommand extends TerminusCommand implements SiteAwareInterface
     private function emitNotice($element)
     {
         $this->log()->notice(
-            "Cloning ${element} from {source} environment to {target} environment",
-            ['source' => $this->source_env->getName(), 'target' => $this->target_env->getName(),]
+            "Cloning {$element} from {source} environment to {target} environment",
+            [
+                'source' => $this->source_env->getName(),
+                'target' => $this->target_env->getName(),
+            ]
         );
     }
 

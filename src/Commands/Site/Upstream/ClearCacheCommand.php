@@ -17,7 +17,7 @@ class ClearCacheCommand extends TerminusCommand implements SiteAwareInterface
     use WorkflowProcessingTrait;
 
     /**
-     * Clears caches for the site's codeserver.
+     * Clears caches for the site codeserver.
      *
      * @authorize
      *
@@ -32,6 +32,6 @@ class ClearCacheCommand extends TerminusCommand implements SiteAwareInterface
     {
         $site_obj = $this->sites->get($site);
         $this->processWorkflow($site_obj->getUpstream()->clearCache());
-        $this->log()->notice('Code cache cleared on {site}.', ['site' => $site_obj->get('name'),]);
+        $this->log()->notice('Code cache cleared on {site}.', ['site' => $site_obj->getName(),]);
     }
 }

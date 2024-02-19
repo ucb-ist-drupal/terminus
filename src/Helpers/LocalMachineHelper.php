@@ -5,7 +5,9 @@ namespace Pantheon\Terminus\Helpers;
 use League\Container\ContainerAwareInterface;
 use League\Container\ContainerAwareTrait;
 use Pantheon\Terminus\Config\ConfigAwareTrait;
+use Pantheon\Terminus\Exceptions\TerminusAlreadyExistsException;
 use Pantheon\Terminus\Exceptions\TerminusException;
+use Pantheon\Terminus\Helpers\Traits\CommandExecutorTrait;
 use Pantheon\Terminus\ProgressBars\ProcessProgressBar;
 use Robo\Common\IO;
 use Robo\Contract\ConfigAwareInterface;
@@ -15,9 +17,9 @@ use Symfony\Component\Finder\Finder;
 use Symfony\Component\Process\Process;
 
 /**
- * Class ShellExecHelper
+ * Class ShellExecHelper.
  *
- * A helper for executing commands on the local client. A wrapper for 'exec' and 'passthru'.
+ * A helper for executing commands on the local client. A wrapper for 'exec'.
  *
  * @package Pantheon\Terminus\Helpers
  */
@@ -25,8 +27,9 @@ class LocalMachineHelper implements ConfigAwareInterface, ContainerAwareInterfac
 {
     use ConfigAwareTrait;
     use ContainerAwareTrait;
-    use IO {
-        io as roboIo;
+    use IO;
+    use CommandExecutorTrait {
+        CommandExecutorTrait::execute as executeUnbuffered;
     }
 
     /**
@@ -39,7 +42,11 @@ class LocalMachineHelper implements ConfigAwareInterface, ContainerAwareInterfac
     {
         $process = $this->getProcess($cmd);
         $process->run($callback);
-        return ['output' => $process->getOutput(), 'exit_code' => $process->getExitCode(),];
+        return [
+            'output' => $process->getOutput(),
+            'stderr' => $process->getErrorOutput(),
+            'exit_code' => $process->getExitCode(),
+        ];
     }
 
     /**
@@ -49,29 +56,32 @@ class LocalMachineHelper implements ConfigAwareInterface, ContainerAwareInterfac
      * @param callable $callback A function to run while waiting for the process to complete
      * @param bool $progressIndicatorAllowed Allow the progress bar to be used (if in tty mode only)
      * @return array The command output and exit_code
+     *
+     * @throws TerminusException
      */
-    public function execute($cmd, $callback = null, $progressIndicatorAllowed = false)
+    public function execute($cmd, $callback, $progressIndicatorAllowed): array
     {
         $process = $this->getProcess($cmd);
         $useTty = $this->useTty();
-        // Set tty mode if the user is running terminus iteractively.
-        if (function_exists('posix_isatty')) {
-            if (!isset($useTty)) {
-                $useTty = (posix_isatty(STDOUT) && posix_isatty(STDIN));
-            }
-            if (!posix_isatty(STDIN)) {
-                $process->setInput(STDIN);
-            }
-        }
         $process->setTty($useTty);
-        // Use '$useTty' as a sort of 'isInteractive' indicator.
-        if ($useTty && $progressIndicatorAllowed) {
+        if (false === $useTty && !stream_isatty(STDIN)) {
+            $process->setInput(STDIN);
+        }
+
+        $process->start();
+        if ($progressIndicatorAllowed && $useTty) {
             $this->getProgressBar($process)->cycle($callback);
         } else {
-            $process->start();
-            $process->wait($callback);
+            false === $useTty ?
+                $process->wait($callback) :
+                $process->wait();
         }
-        return ['output' => $process->getOutput(), 'exit_code' => $process->getExitCode(),];
+
+        return [
+            'output' => $process->getOutput(),
+            'stderr' => $process->getErrorOutput(),
+            'exit_code' => $process->getExitCode(),
+        ];
     }
 
     /**
@@ -95,44 +105,18 @@ class LocalMachineHelper implements ConfigAwareInterface, ContainerAwareInterfac
     }
 
     /**
-     * Returns a ProcessProgressBar
+     * Returns a ProcessProgressBar.
      *
      * @param Process $process
+     *
      * @return ProcessProgressBar
      */
     public function getProgressBar(Process $process)
     {
-        $process->start();
-        return $this->getContainer()->get(ProcessProgressBar::class, [$this->output(), $process,]);
-    }
-
-    /**
-     * Opens the given URL in a browser on the local machine.
-     *
-     * @param $url The URL to be opened
-     * @throws \Pantheon\Terminus\Exceptions\TerminusException
-     */
-    public function openUrl($url)
-    {
-        // Otherwise attempt to launch it.
-        $cmd = '';
-        switch (php_uname('s')) {
-            case 'Linux':
-                $cmd = 'xdg-open';
-                break;
-            case 'Darwin':
-                $cmd = 'open';
-                break;
-            case 'Windows NT':
-                $cmd = 'start';
-                break;
-        }
-        if (!$cmd) {
-            throw new TerminusException('Terminus is unable to open a browser on this OS.');
-        }
-        $command = sprintf('%s %s', $cmd, $url);
-
-        $this->getProcess($command)->run();
+        $nickname = \uniqid(__METHOD__ . "-");
+        $this->getContainer()->add($nickname, ProcessProgressBar::class)
+            ->addArguments([$this->output(), $process]);
+        return $this->getContainer()->get($nickname);
     }
 
     /**
@@ -149,19 +133,16 @@ class LocalMachineHelper implements ConfigAwareInterface, ContainerAwareInterfac
     /**
      * Determine whether the use of a tty is appropriate.
      *
-     * @return bool|null
+     * @return bool
      */
-    public function useTty()
+    public function useTty(): bool
     {
-        // If we are not in interactive mode, then never use a tty.
         if (!$this->input()->isInteractive()) {
+            // If we are not in interactive mode, then never use a tty.
             return false;
         }
-        // If we are in interactive mode (or at least the user did not
-        // specify -n / --no-interaction), then also prevent the use
-        // of a tty if stdout is redirected.
-        // Otherwise, let the local machine helper decide whether to use a tty.
-        return (function_exists('posix_isatty') && !posix_isatty(STDOUT)) ? false : null;
+
+        return stream_isatty(STDIN) && stream_isatty(STDOUT);
     }
 
     /**
@@ -184,7 +165,7 @@ class LocalMachineHelper implements ConfigAwareInterface, ContainerAwareInterfac
     protected function fixFilename($filename)
     {
         $config = $this->getConfig();
-        return $config->fixDirectorySeparators(str_replace('~', $config->get('user_home'), $filename));
+        return $config->fixDirectorySeparators(str_replace('~', $config->get('user_home') ?? '', $filename ?? ''));
     }
 
     /**
@@ -193,11 +174,73 @@ class LocalMachineHelper implements ConfigAwareInterface, ContainerAwareInterfac
      * @param string $cmd The command to execute
      * @return Process
      */
-    protected function getProcess($cmd)
+    protected function getProcess(string $cmd)
     {
-        $process = new Process($cmd);
+        $process = Process::fromShellCommandline($cmd);
         $config = $this->getConfig();
         $process->setTimeout($config->get('timeout'));
+
         return $process;
+    }
+
+    /**
+     * Clones the Git repository.
+     *
+     * @param string $gitUrl
+     * @param string $path
+     * @param bool $overrideIfExists
+     * @param string $branch
+     *   The branch to clone. Defaults to remote HEAD pointer.
+     *
+     * @throws \Pantheon\Terminus\Exceptions\TerminusAlreadyExistsException
+     * @throws \Pantheon\Terminus\Exceptions\TerminusException
+     */
+    public function cloneGitRepository(
+        string $gitUrl,
+        string $path,
+        bool $overrideIfExists = false,
+        string $branch = ''
+    ) {
+        if (is_dir($path . DIRECTORY_SEPARATOR . '.git')) {
+            if (!$overrideIfExists) {
+                throw new TerminusAlreadyExistsException(sprintf('The repository already exists in %s', $path));
+            }
+
+            if ('' !== trim($path, DIRECTORY_SEPARATOR . ' ')) {
+                $this->executeUnbuffered('rm -rf "%s"', [$path]);
+            }
+        }
+
+        $additionalOptions = $branch ? sprintf('--branch %s', $branch) : '';
+
+        $this->executeUnbuffered('git clone %s %s %s', [$gitUrl, $path, $additionalOptions]);
+    }
+
+    /**
+     * Opens the given URL in a browser on the local machine.
+     *
+     * @param $url The URL to be opened
+     * @throws \Pantheon\Terminus\Exceptions\TerminusException
+     */
+    public function openUrl($url)
+    {
+        $cmd = '';
+        switch (php_uname('s')) {
+            case 'Linux':
+                $cmd = 'xdg-open';
+                break;
+            case 'Darwin':
+                $cmd = 'open';
+                break;
+            case 'Windows NT':
+                $cmd = 'start';
+                break;
+        }
+        if (!$cmd) {
+            throw new TerminusException('Terminus is unable to open a browser on this OS.');
+        }
+        $command = sprintf('%s %s', $cmd, $url);
+
+        $this->getProcess($command)->run();
     }
 }

@@ -30,11 +30,11 @@ class RemoveCommand extends TerminusCommand implements SiteAwareInterface
      */
     public function remove($site_name)
     {
-        $site = $this->getSite($site_name);
+        $site = $this->getSiteById($site_name);
         $this->processWorkflow($site->removePaymentMethod());
         $this->log()->notice(
             'The payment method for the {site} site has been removed.',
-            ['site' => $site->get('name'),]
+            ['site' => $site->getName()]
         );
     }
 }

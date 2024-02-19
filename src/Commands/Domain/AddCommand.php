@@ -7,7 +7,8 @@ use Pantheon\Terminus\Site\SiteAwareInterface;
 use Pantheon\Terminus\Site\SiteAwareTrait;
 
 /**
- * Class AddCommand
+ * Class AddCommand.
+ *
  * @package Pantheon\Terminus\Commands\Domain
  */
 class AddCommand extends TerminusCommand implements SiteAwareInterface
@@ -25,14 +26,21 @@ class AddCommand extends TerminusCommand implements SiteAwareInterface
      * @param string $domain Domain e.g. `example.com`
      *
      * @usage <site>.<env> <domain_name> Associates <domain_name> with <site>'s <env> environment.
+     *
+     * @throws \Pantheon\Terminus\Exceptions\TerminusException
      */
     public function add($site_env, $domain)
     {
-        list($site, $env) = $this->getSiteEnv($site_env);
+        $env = $this->getEnv($site_env);
         $env->getDomains()->create($domain);
+
         $this->log()->notice(
             'Added {domain} to {site}.{env}',
-            ['domain' => $domain, 'site' => $site->get('name'), 'env' => $env->id,]
+            [
+                'domain' => $domain,
+                'site' => $this->getSiteById($site_env)->getName(),
+                'env' => $env->getName(),
+            ]
         );
     }
 }

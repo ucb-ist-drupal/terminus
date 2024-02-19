@@ -7,14 +7,15 @@ use Pantheon\Terminus\Site\SiteAwareInterface;
 use Pantheon\Terminus\Site\SiteAwareTrait;
 
 /**
- * Class WatchCommand
+ * Class WatchCommand.
+ *
  * @package Pantheon\Terminus\Commands\Workflow
  */
 class WatchCommand extends TerminusCommand implements SiteAwareInterface
 {
     use SiteAwareTrait;
 
-    const WORKFLOWS_WATCH_INTERVAL = 5;
+    public const WORKFLOWS_WATCH_INTERVAL = 5;
     /**
      * @var array We keep track of workflows that have been printed. This is necessary because the local clock may
      * drift from the server's clock, causing events to be printed twice.
@@ -32,16 +33,23 @@ class WatchCommand extends TerminusCommand implements SiteAwareInterface
      *
      * @command workflow:watch
      *
-     * @param string $site_id Site name
      * @option integer $checks Times to query
      *
      * @usage <site> Streams new and finished workflows from <site> to the console.
+     *
+     * @param string $site_id Site name
+     * @param null[] $options
+     *
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws \Pantheon\Terminus\Exceptions\TerminusException
+     * @throws \Psr\Container\ContainerExceptionInterface
+     * @throws \Psr\Container\NotFoundExceptionInterface
      */
-    public function watch($site_id, $options = ['checks' => null,])
+    public function watch($site_id, $options = ['checks' => null])
     {
-        $site = $this->getSite($site_id);
+        $site = $this->getSiteById($site_id);
         if (!is_null($number_of_checks = $options['checks'])) {
-            $number_of_checks = (integer)$number_of_checks;
+            $number_of_checks = (int)$number_of_checks;
         }
 
         $this->log()->notice('Watching workflows...');
@@ -56,11 +64,13 @@ class WatchCommand extends TerminusCommand implements SiteAwareInterface
 
             $workflows = $site->getWorkflows()->all();
             foreach ($workflows as $workflow) {
+                /** @var \Pantheon\Terminus\Models\Workflow $workflow */
                 if ($workflow->wasCreatedAfter($last_wf_created_at) && !$this->startedNoticeAlreadyEmitted($workflow)) {
                     $this->emitStartedNotice($workflow);
                 }
 
-                if ($workflow->wasFinishedAfter($last_wf_finished_at)
+                if (
+                    $workflow->wasFinishedAfter($last_wf_finished_at)
                     && !$this->finishedNoticeAlreadyEmitted($workflow)
                 ) {
                     $this->emitFinishedNotice($workflow);
@@ -76,9 +86,9 @@ class WatchCommand extends TerminusCommand implements SiteAwareInterface
     }
 
     /**
-     * Emits a workflow-finished notice
+     * Emits a workflow-finished notice.
      *
-     * @param Workflow $workflow
+     * @param \Pantheon\Terminus\Models\Workflow $workflow
      */
     protected function emitFinishedNotice($workflow)
     {
@@ -88,21 +98,21 @@ class WatchCommand extends TerminusCommand implements SiteAwareInterface
             'id'          => $workflow->id,
             'description' => $workflow->get('description'),
             'env'         => $workflow->get('environment'),
-            'time'        => date($date_format, $workflow->get('finished_at')),
+            'time'        => date($date_format, $workflow->getFinishedAt()),
         ];
         $this->log()->notice($finished_message, $finished_context);
         array_push($this->finished, $workflow->id);
     }
 
     /**
-     * Emits workflow operation logs for a workflow
+     * Emits workflow operation logs for a workflow.
      *
-     * @param Workflow $workflow
+     * @param \Pantheon\Terminus\Models\Workflow $workflow
      */
     protected function emitOperationLogs($workflow)
     {
         $workflow->fetchWithLogs();
-        $operations = $workflow->operations();
+        $operations = $workflow->getOperations()->all();
         foreach ($operations as $operation) {
             if ($operation->has('log_output')) {
                 $this->log()->notice($operation);
@@ -111,9 +121,9 @@ class WatchCommand extends TerminusCommand implements SiteAwareInterface
     }
 
     /**
-     * Emits a workflow-started notice
+     * Emits a workflow-started notice.
      *
-     * @param Workflow $workflow
+     * @param \Pantheon\Terminus\Models\Workflow $workflow
      */
     protected function emitStartedNotice($workflow)
     {
@@ -123,16 +133,17 @@ class WatchCommand extends TerminusCommand implements SiteAwareInterface
             'id'          => $workflow->id,
             'description' => $workflow->get('description'),
             'env'         => $workflow->get('environment'),
-            'time'        => date($date_format, $workflow->get('started_at')),
+            'time'        => date($date_format, $workflow->getStartedAt()),
         ];
         $this->log()->notice($started_message, $started_context);
         array_push($this->started, $workflow->id);
     }
 
     /**
-     * Queries the finished-workflow list for this workflow and returns true if it is present
+     * Queries the finished-workflow list for this workflow and returns true if it is present.
      *
-     * @param Workflow $workflow
+     * @param \Pantheon\Terminus\Models\Workflow $workflow
+     *
      * @return boolean
      */
     protected function finishedNoticeAlreadyEmitted($workflow)
@@ -141,9 +152,10 @@ class WatchCommand extends TerminusCommand implements SiteAwareInterface
     }
 
     /**
-     * Queries the started-workflow list for this workflow and returns true if it is present
+     * Queries the started-workflow list for this workflow and returns true if it is present.
      *
-     * @param Workflow $workflow
+     * @param \Pantheon\Terminus\Models\Workflow $workflow
+     *
      * @return boolean
      */
     protected function startedNoticeAlreadyEmitted($workflow)

@@ -2,14 +2,20 @@
 
 namespace Pantheon\Terminus\Helpers\AliasEmitters;
 
+use Psr\Log\LoggerAwareInterface;
+use Psr\Log\LoggerAwareTrait;
 use Symfony\Component\Filesystem\Filesystem;
 
-class AliasesDrushRcEmitter extends AliasesDrushRcBase
+class AliasesDrushRcEmitter extends AliasesDrushRcBase implements
+    LoggerAwareInterface
 {
+    use LoggerAwareTrait;
+
     protected $location;
+    protected $base_dir;
 
     /**
-     * AliasesDrushRcEmitter consturctor
+     * AliasesDrushRcEmitter constructor.
      *
      * @param string $location
      * @param string $base_dir
@@ -43,7 +49,7 @@ class AliasesDrushRcEmitter extends AliasesDrushRcBase
         // Add in our directory location to the Drush alias file search path
         $drushRCEditor = new DrushRcEditor($this->base_dir);
         $drushConfig = $drushRCEditor->getDrushConfig();
-        $drushConfigFiltered = implode("\n", array_filter($drushConfig, array($this, 'filterForPantheon')));
+        $drushConfigFiltered = implode("\n", array_filter($drushConfig, [$this, 'filterForPantheon']));
         $drushConfigFiltered .= "\n" . '$options["include"][] = drush_server_home() . "/.drush/pantheon/drush8";';
         $drushRCEditor->writeDrushConfig($drushConfigFiltered);
 
@@ -55,7 +61,7 @@ class AliasesDrushRcEmitter extends AliasesDrushRcBase
             $fs->mkdir($policyToPath);
         }
         $policyTemplate = new Template();
-        $copied = $policyTemplate->copy($policyFromPath, $policyToPath);
+        $policyTemplate->copy($policyFromPath, $policyToPath);
     }
 
     /**
@@ -65,7 +71,7 @@ class AliasesDrushRcEmitter extends AliasesDrushRcBase
      */
     protected function filterForPantheon($line)
     {
-        if (strpos($line, '.drush/pantheon/drush8') !== false) {
+        if (strpos($line ?? '', '.drush/pantheon/drush8') !== false) {
             return false;
         }
         return true;

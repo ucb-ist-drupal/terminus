@@ -7,24 +7,25 @@ use Pantheon\Terminus\Friends\EnvironmentTrait;
 
 /**
  * Class UpstreamStatus
+ *
  * @package Pantheon\Terminus\Models
  */
 class UpstreamStatus extends TerminusModel implements EnvironmentInterface
 {
     use EnvironmentTrait;
 
-    const PRETTY_NAME = 'upstream status';
+    public const PRETTY_NAME = 'upstream status';
 
     /**
      * @var object|null
      */
     protected $updates = null;
 
-     /**
-      * Stores composer dependency updates.
-      *
-      * @var object|null
-      */
+    /**
+     * Stores composer dependency updates.
+     *
+     * @var object|null
+     */
     protected $composerUpdates = null;
 
     public function __construct($attributes, array $options = [])
@@ -42,7 +43,8 @@ class UpstreamStatus extends TerminusModel implements EnvironmentInterface
      */
     public function getStatus()
     {
-        return $this->hasUpdates() ? 'outdated' : 'current';
+        return $this->hasUpdates() || $this->hasComposerUpdates(
+        ) ? 'outdated' : 'current';
     }
 
     /**
@@ -63,7 +65,7 @@ class UpstreamStatus extends TerminusModel implements EnvironmentInterface
     }
 
     /**
-     * Retrives composer dependecy updates
+     * Retrives composer dependency updates
      *
      * @return object
      */
@@ -87,6 +89,19 @@ class UpstreamStatus extends TerminusModel implements EnvironmentInterface
     }
 
     /**
+     * Determines whether there are any composer updates to be applied.
+     *
+     * @return bool
+     */
+    public function hasComposerUpdates(): bool
+    {
+        $composerUpdates = $this->getComposerUpdates();
+        return !empty($composerUpdates->added_dependencies) ||
+            !empty($composerUpdates->updated_dependencies) ||
+            !empty($composerUpdates->removed_dependencies);
+    }
+
+    /**
      * Determines whether there are any updates to be applied.
      *
      * @return bool
@@ -104,6 +119,7 @@ class UpstreamStatus extends TerminusModel implements EnvironmentInterface
         }
 
         return !($updates->{$env->id}->is_up_to_date_with_upstream
-            && $updates->{$env->getParentEnvironment()->id}->is_up_to_date_with_upstream);
+            && $updates->{$env->getParentEnvironment(
+            )->id}->is_up_to_date_with_upstream);
     }
 }

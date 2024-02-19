@@ -14,23 +14,35 @@ use Symfony\Component\Console\Input\InputInterface;
 
 /**
  * Class MetricsCommand
+ *
  * @package Pantheon\Terminus\Commands\Env
  */
 class MetricsCommand extends TerminusCommand implements SiteAwareInterface
 {
     use SiteAwareTrait;
 
-    const DAILY_PERIOD = 'day';
-    const WEEKLY_PERIOD = 'week';
-    const MONTHLY_PERIOD = 'month';
+    public const DAILY_PERIOD = 'day';
 
-    const DEFAULT_MONTHLY_DATAPOINTS = 12;
-    const DEFAULT_WEEKLY_DATAPOINTS = 12;
-    const DEFAULT_DAILY_DATAPOINTS = 28;
+    public const WEEKLY_PERIOD = 'week';
+
+    public const MONTHLY_PERIOD = 'month';
+
+    public const DAILY_PERIOD_SHORT = 'd';
+
+    public const WEEKLY_PERIOD_SHORT = 'w';
+
+    public const MONTHLY_PERIOD_SHORT = 'm';
+
+    public const DEFAULT_MONTHLY_DATAPOINTS = 12;
+
+    public const DEFAULT_WEEKLY_DATAPOINTS = 12;
+
+    public const DEFAULT_DAILY_DATAPOINTS = 28;
 
     /**
      * Displays the pages served and unique visit metrics for the specified
-     * site's environment. The most recent data up to the current day is returned.
+     * site environment. The most recent data up to the current day is
+     * returned.
      *
      * @authorize
      *
@@ -41,52 +53,76 @@ class MetricsCommand extends TerminusCommand implements SiteAwareInterface
      *     datetime: Period
      *     visits: Visits
      *     pages_served: Pages Served
-     * @return RowsOfFieldsWithMetadata
+     *     cache_hits: Cache Hits
+     *     cache_misses: Cache Misses
+     *     cache_hit_ratio: Cache Hit Ratio
      *
-     * @param string $site_env Site & environment in the format `site-name.env`.
+     * @param string $site_env Site & environment in the format
+     *     `site-name.env`.
      *   Defaults to the live environment if `.env` is not specified.
+     * @param string[] $options
+     *
+     * @usage <site>.<env> Displays metrics for <site>'s <env> environment.
+     * @usage <site> Displays the combined metrics for all of <site>'s
+     *     environments.
+     * @usage <site> --fields=datetime,pages_served Displays only the pages
+     *     served for each date period.
+     *
      * @option period The time period for each data point (month|week|day)
      * @option datapoints How much data to return in total, or 'auto' to select
      *   a resonable default based on the selected period.
      *
-     * @usage <site>.<env> Displays metrics for <site>'s <env> environment.
-     * @usage <site> Displays the combined metrics for all of <site>'s environments.
-     * @usage <site> --fields=datetime,pages_served Displays only the pages served for each date period.
+     * @return \Consolidation\OutputFormatters\StructuredData\RowsOfFieldsWithMetadata
+     *
+     * @throws \Pantheon\Terminus\Exceptions\TerminusException
      */
     public function metrics(
         $site_env,
         $options = [
             'period' => self::DAILY_PERIOD,
-            'datapoints' => 'auto'
+            'datapoints' => 'auto',
         ]
     ) {
-        list($site_id, $env_id) = array_pad(explode('.', $site_env), 2, null);
-
-        if (empty($env_id)) {
-            $site = $this->getSite($site_id);
-
-            $data = $site->getSiteMetrics()
-                ->setPeriod($options['period'])
-                ->setDatapoints($this->selectDatapoints($options['datapoints'], $options['period']))
+        $env = $this->getOptionalEnv($site_env);
+        if (null !== $env) {
+            $metrics = $env->getEnvironmentMetrics()
+                ->setDuration(
+                    $this->selectDatapoints(
+                        $options['datapoints'],
+                        $options['period']
+                    )
+                )
                 ->serialize();
         } else {
-            list(, $env) = $this->getUnfrozenSiteEnv($site_env, 'live');
-
-            $data = $env->getEnvironmentMetrics()
-                ->setPeriod($options['period'])
-                ->setDatapoints($this->selectDatapoints($options['datapoints'], $options['period']))
+            $metrics = $this->getSiteById($site_env)
+                ->getSiteMetrics()
+                ->setDuration(
+                    $this->selectDatapoints(
+                        $options['datapoints'],
+                        $options['period']
+                    )
+                )
                 ->serialize();
         }
 
-        return (new RowsOfFieldsWithMetadata($data))
+        return (new RowsOfFieldsWithMetadata($metrics))
             ->setDataKey('timeseries')
             ->addRenderer(
-                new NumericCellRenderer($data['timeseries'], ['visits' => 6, 'pages_served' => 12])
+                new NumericCellRenderer($metrics['timeseries'], [
+                    'visits' => 6,
+                    'pages_served' => 12,
+                    'cache_hits' => 12,
+                    'cache_misses' => 12,
+                ])
             )
             ->addRendererFunction(
-                function ($key, $cellData, FormatterOptions $options, $rowData) {
+                function ($key, $cellData) {
                     if ($key == 'datetime') {
-                        $cellData = str_replace('T00:00:00', '', $cellData);
+                        $cellData = str_replace(
+                            'T00:00:00',
+                            '',
+                            $cellData ?? ''
+                        );
                     }
                     return $cellData;
                 }
@@ -94,39 +130,28 @@ class MetricsCommand extends TerminusCommand implements SiteAwareInterface
     }
 
     /**
-     * Find the maximum width of any data item in the specified column.
-     * @param array $data
-     * @param string $column
-     * @return int
-     */
-    protected function findWidth($data, $column)
-    {
-        $maxWidth = 0;
-        foreach ($data as $row) {
-            $str = number_format($row[$column]);
-            $maxWidth = max($maxWidth, strlen($str));
-        }
-        return $maxWidth;
-    }
-
-    /**
-     * Determine the value we should use for 'datapoints' given a specific period.
+     * Determine the value we should use for 'datapoints' given a specific
+     * period.
+     *
      * @param string $datapoints
      * @param string $period
+     *
      * @return string
      */
     protected function selectDatapoints($datapoints, $period)
     {
         if (!$datapoints || ($datapoints == 'auto')) {
-            return $this->defaultDatapoints($period);
+            $datapoints = $this->defaultDatapoints($period);
         }
-        return $datapoints;
+
+        return $datapoints . $this->shortPeriod($period);
     }
 
     /**
      * Ensure that the user did not supply an invalid value for 'period'.
      *
      * @hook validate env:metrics
+     *
      * @param CommandData $commandData
      */
     public function validateOptions(CommandData $commandData)
@@ -150,12 +175,16 @@ class MetricsCommand extends TerminusCommand implements SiteAwareInterface
 
     /**
      * Test to see if an option value is one of the provided values
+     *
      * @param InputInterface $input
      * @param string $option_name
      * @param string[] $valid_values
      */
-    protected function validateOptionValue(InputInterface $input, $option_name, array $valid_values)
-    {
+    protected function validateOptionValue(
+        InputInterface $input,
+        $option_name,
+        array $valid_values
+    ) {
         $value = $input->getOption($option_name);
         if (!in_array($value, $valid_values)) {
             throw new TerminusException(
@@ -170,7 +199,9 @@ class MetricsCommand extends TerminusCommand implements SiteAwareInterface
     }
 
     /**
-     * Check to see if the specified item is within the specified minimum/maximum range.
+     * Check to see if the specified item is within the specified
+     * minimum/maximum range.
+     *
      * @param InputInterface $input
      * @param string $option_name
      * @param string $minimum
@@ -190,7 +221,9 @@ class MetricsCommand extends TerminusCommand implements SiteAwareInterface
         }
         $or_one_of = '';
         if (count($exceptional_values) != 0) {
-            $or_one_of = (count($exceptional_values) == 1) ? 'or ' : 'or one of ';
+            $or_one_of = (count(
+                $exceptional_values
+            ) == 1) ? 'or ' : 'or one of ';
         }
         if (($value < $minimum) || ($value > $maximum)) {
             throw new TerminusException(
@@ -210,7 +243,9 @@ class MetricsCommand extends TerminusCommand implements SiteAwareInterface
 
     /**
      * Default data points to 12 / 28 if 'auto' is specified
+     *
      * @param string $period
+     *
      * @return string
      */
     public function defaultDatapoints($period)
@@ -222,7 +257,9 @@ class MetricsCommand extends TerminusCommand implements SiteAwareInterface
 
     /**
      * Return the maximum data point value for the provided period.
+     *
      * @param string $period
+     *
      * @return string
      */
     public function datapointsMaximum($period)
@@ -234,5 +271,23 @@ class MetricsCommand extends TerminusCommand implements SiteAwareInterface
         ];
 
         return $defaultPeriodValues[$period];
+    }
+
+    /**
+     * Return the period in short format.
+     *
+     * @param string $period
+     *
+     * @return string
+     */
+    public function shortPeriod($period)
+    {
+        $shortPeriodValues = [
+            self::DAILY_PERIOD => self::DAILY_PERIOD_SHORT,
+            self::WEEKLY_PERIOD => self::WEEKLY_PERIOD_SHORT,
+            self::MONTHLY_PERIOD => self::MONTHLY_PERIOD_SHORT,
+        ];
+
+        return $shortPeriodValues[$period];
     }
 }

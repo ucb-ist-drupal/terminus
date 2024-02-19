@@ -9,7 +9,8 @@ use Pantheon\Terminus\Site\SiteAwareTrait;
 use Pantheon\Terminus\Exceptions\TerminusNotFoundException;
 
 /**
- * Class LookupCommand
+ * Class LookupCommand.
+ *
  * @package Pantheon\Terminus\Commands\Domain
  */
 class LookupCommand extends TerminusCommand implements SiteAwareInterface
@@ -40,21 +41,32 @@ class LookupCommand extends TerminusCommand implements SiteAwareInterface
     {
         $this->log()->notice('This operation may take a long time to run.');
         $sites = $this->sites()->all();
-        $environments = ['dev', 'test', 'live',];
         foreach ($sites as $site) {
+            $environments = $site->getEnvironments()->ids();
             foreach ($environments as $env_name) {
-                if ($site->getEnvironments()->get($env_name)->getDomains()->has($domain)) {
-                    $env = ['site_id' => $site->id, 'site_name' => $site->get('name'), 'env_id' => $env_name,];
-                    break 2;
+                try {
+                    $env = $site->getEnvironments()->get($env_name);
+                } catch (TerminusNotFoundException $e) {
+                    $this->log()->warning(
+                        'Site {site}: {message}',
+                        ['site' => $site->id, 'message' => $e->getMessage()]
+                    );
+                    continue;
+                }
+
+                if ($env->getDomains()->has($domain)) {
+                    return new PropertyList([
+                        'site_id' => $site->id,
+                        'site_name' => $site->getName(),
+                        'env_id' => $env_name,
+                    ]);
                 }
             }
         }
-        if (!isset($env)) {
-            throw new TerminusNotFoundException(
-                'Could not locate an environment with the domain {domain}.',
-                compact('domain')
-            );
-        }
-        return new PropertyList($env);
+
+        throw new TerminusNotFoundException(
+            'Could not locate an environment with the domain {domain}.',
+            compact('domain')
+        );
     }
 }

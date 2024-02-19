@@ -2,6 +2,7 @@
 
 namespace Pantheon\Terminus\Collections;
 
+use Pantheon\Terminus\Exceptions\TerminusException;
 use Pantheon\Terminus\Models\Environment;
 use Pantheon\Terminus\Models\Organization;
 use Pantheon\Terminus\Models\Site;
@@ -19,7 +20,7 @@ class Workflows extends APICollection implements SessionAwareInterface
 {
     use SessionAwareTrait;
 
-    const PRETTY_NAME = 'workflows';
+    public const PRETTY_NAME = 'workflows';
     /**
      * @var string
      */
@@ -88,10 +89,10 @@ class Workflows extends APICollection implements SessionAwareInterface
      *   - params: associative array of parameters for the request
      * @return Workflow $model
      */
-    public function create($type, array $options = [])
+    public function create($type, array $options = []): Workflow
     {
-        $params = isset($options['params']) ? $options['params'] : [];
 
+        $params = $options['params'] ?? [];
         $results = $this->request()->request(
             $this->getUrl(),
             [
@@ -102,14 +103,23 @@ class Workflows extends APICollection implements SessionAwareInterface
                 ],
             ]
         );
-
-        $model = $this->getContainer()->get(
-            $this->collected_class,
-            [
-                $results['data'],
-                ['id' => $results['data']->id, 'collection' => $this,]
-            ]
-        );
+        if ($results->isError()) {
+            throw new TerminusException(
+                "Workflow Creation Failed: {error}",
+                ['error' => $results->getStatusCodeReason()]
+            );
+        }
+        $nickname = \uniqid(__CLASS__ . "-");
+        $this->getContainer()->add($nickname, $this->collected_class)
+            ->addArguments([
+                $results->getData(),
+                [
+                    'id' => $results->getData()->id,
+                    'collection' => $this,
+                    'owner' => $this->owner
+                ]
+            ]);
+        $model = $this->getContainer()->get($nickname);
         $this->add($model);
         return $model;
     }
@@ -157,7 +167,7 @@ class Workflows extends APICollection implements SessionAwareInterface
      */
     public function fetchWithOperations()
     {
-        $this->setFetchArgs(['query' => ['hydrate' => 'operations',],]);
+        $this->setFetchArgs(['query' => ['hydrate' => 'operations']]);
         $this->fetch();
     }
 

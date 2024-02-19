@@ -18,7 +18,7 @@ class RoleCommand extends TerminusCommand implements SiteAwareInterface
     use WorkflowProcessingTrait;
 
     /**
-     * Updates a user's role on a site's team.
+     * Updates a user role on a site team.
      *
      * @authorize
      *
@@ -32,8 +32,8 @@ class RoleCommand extends TerminusCommand implements SiteAwareInterface
      */
     public function role($site_id, $member, $role)
     {
-        $site = $this->getSite($site_id);
-        if (!(boolean)$site->getFeature('change_management')) {
+        $site = $this->getSiteById($site_id);
+        if (!(bool)$site->getFeature('change_management')) {
             throw new TerminusException('This site does not have its change-management option enabled.');
         }
         $workflow = $site->getUserMemberships()->get($member)->setRole($role);

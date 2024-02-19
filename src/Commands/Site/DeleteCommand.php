@@ -3,14 +3,18 @@
 namespace Pantheon\Terminus\Commands\Site;
 
 use Pantheon\Terminus\Commands\WorkflowProcessingTrait;
+use Pantheon\Terminus\Site\SiteAwareInterface;
+use Pantheon\Terminus\Site\SiteAwareTrait;
 
 /**
- * Class DeleteCommand
+ * Class DeleteCommand.
+ *
  * @package Pantheon\Terminus\Commands\Site
  */
-class DeleteCommand extends SiteCommand
+class DeleteCommand extends SiteCommand implements SiteAwareInterface
 {
     use WorkflowProcessingTrait;
+    use SiteAwareTrait;
 
     /**
      * Deletes a site from Pantheon.
@@ -22,25 +26,26 @@ class DeleteCommand extends SiteCommand
      * @param string $site_id Site name
      *
      * @usage <site> Deletes <site> from Pantheon.
+     *
+     * @throws \Pantheon\Terminus\Exceptions\TerminusException
      */
     public function delete($site_id)
     {
-        $site = $this->getSite($site_id);
-        $site_name = $site->getName();
-        if (!$this->confirm('Are you sure you want to delete {site}?', ['site' => $site_name,])) {
+        $site = $this->sites()->get($site_id);
+        if (
+            !$this->input()->getOption('yes')
+            && !$this->io()->confirm(sprintf('Are you sure you want to delete %s site?', $site_id))
+        ) {
             return;
         }
 
         $workflow = $site->delete();
-        try {
-            $this->processWorkflow($workflow);
-            $message = $workflow->getMessage();
-        } catch (\Exception $e) {
-            if ($e->getCode() !== 404) {
-                throw $e;
-            }
-            $message = 'Deleted {site} from Pantheon';
-        }
-        $this->log()->notice($message, ['site' => $site_name,]);
+
+        // We need to query the user workflows API to watch the delete_site workflow, since the site object won't exist anymore
+        $workflow->setOwnerObject($this->session()->getUser());
+
+        $this->processWorkflow($workflow);
+        $message = $workflow->getMessage();
+        $this->log()->notice($message, ['site' => $site_id]);
     }
 }

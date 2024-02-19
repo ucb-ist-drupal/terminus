@@ -20,6 +20,7 @@ use Pantheon\Terminus\Friends\SitesTrait;
 
 /**
  * Class User
+ *
  * @package Pantheon\Terminus\Models
  */
 class User extends TerminusModel implements
@@ -33,40 +34,60 @@ class User extends TerminusModel implements
     use ProfileTrait;
     use SitesTrait;
 
-    const PRETTY_NAME = 'user';
+    public const PRETTY_NAME = 'user';
+
     /**
      * @var string
      */
     protected $url = 'users/{id}';
+
     /**
      * @var \stdClass
      * @todo Wrap this in a proper class.
      */
     private $aliases;
+
     /**
      * @var PaymentMethods
      */
     private $payment_methods;
+
     /**
      * @var PaymentMethods
      */
     private $machine_tokens;
+
     /**
      * @var UserOrganizationMemberships
      */
     private $org_memberships;
+
     /**
      * @var UserSiteMemberships
      */
     private $site_memberships;
+
     /**
      * @var SSHKeys
      */
     private $ssh_keys;
+
     /**
      * @var Workflows
      */
     private $workflows;
+
+    /**
+     * @var Upstreams
+     */
+    private $upstreams;
+
+    /**
+     * @var SiteOrganizationMemberships
+     *
+     * Set by UserJoinTrait.
+     */
+    public $memberships;
 
     /**
      * Provides Pantheon Dashboard URL for this user
@@ -110,7 +131,11 @@ class User extends TerminusModel implements
     public function getMachineTokens()
     {
         if (empty($this->machine_tokens)) {
-            $this->machine_tokens = $this->getContainer()->get(MachineTokens::class, [['user' => $this,],]);
+            $nickname = \uniqid(__FUNCTION__ . "-");
+            $this->getContainer()->add($nickname, MachineTokens::class)
+                ->addArgument(['user' => $this]);
+            $this->machine_tokens = $this->getContainer()
+                ->get($nickname);
         }
         return $this->machine_tokens;
     }
@@ -131,8 +156,14 @@ class User extends TerminusModel implements
     public function getOrganizationMemberships()
     {
         if (empty($this->org_memberships)) {
+            $nickname = \uniqid(__FUNCTION__ . "-");
+            $this->getContainer()->add(
+                $nickname,
+                UserOrganizationMemberships::class
+            )
+                ->addArgument(['user' => $this]);
             $this->org_memberships = $this->getContainer()
-                ->get(UserOrganizationMemberships::class, [['user' => $this,],]);
+                ->get($nickname);
         }
         return $this->org_memberships;
     }
@@ -143,7 +174,10 @@ class User extends TerminusModel implements
     public function getPaymentMethods()
     {
         if (empty($this->payment_methods)) {
-            $this->payment_methods = $this->getContainer()->get(PaymentMethods::class, [['user' => $this,],]);
+            $nickname = \uniqid(__FUNCTION__ . "-");
+            $this->getContainer()->add($nickname, PaymentMethods::class)
+                ->addArgument(['user' => $this]);
+            $this->payment_methods = $this->getContainer()->get($nickname);
         }
         return $this->payment_methods;
     }
@@ -162,7 +196,10 @@ class User extends TerminusModel implements
     public function getSiteMemberships()
     {
         if (empty($this->site_memberships)) {
-            $this->site_memberships = $this->getContainer()->get(UserSiteMemberships::class, [['user' => $this,],]);
+            $nickname = \uniqid(__FUNCTION__ . "-");
+            $this->getContainer()->add($nickname, UserSiteMemberships::class)
+                ->addArgument(['user' => $this]);
+            $this->site_memberships = $this->getContainer()->get($nickname);
         }
         return $this->site_memberships;
     }
@@ -173,7 +210,10 @@ class User extends TerminusModel implements
     public function getSSHKeys()
     {
         if (empty($this->ssh_keys)) {
-            $this->ssh_keys = $this->getContainer()->get(SSHKeys::class, [['user' => $this,],]);
+            $nickname = \uniqid(__FUNCTION__ . "-");
+            $this->getContainer()->add($nickname, SSHKeys::class)
+                ->addArgument(['user' => $this]);
+            $this->ssh_keys = $this->getContainer()->get($nickname);
         }
         return $this->ssh_keys;
     }
@@ -184,7 +224,10 @@ class User extends TerminusModel implements
     public function getUpstreams()
     {
         if (empty($this->upstreams)) {
-            $this->upstreams = $this->getContainer()->get(Upstreams::class, [['user' => $this,],]);
+            $nickname = \uniqid(__FUNCTION__ . "-");
+            $this->getContainer()->add($nickname, Upstreams::class)
+                ->addArgument(['user' => $this]);
+            $this->upstreams = $this->getContainer()->get($nickname);
         }
         return $this->upstreams;
     }
@@ -195,7 +238,10 @@ class User extends TerminusModel implements
     public function getWorkflows()
     {
         if (empty($this->workflows)) {
-            $this->workflows = $this->getContainer()->get(Workflows::class, [['user' => $this,],]);
+            $nickname = \uniqid(__FUNCTION__ . "-");
+            $this->getContainer()->add($nickname, Workflows::class)
+                ->addArgument(['user' => $this]);
+            $this->workflows = $this->getContainer()->get($nickname);
         }
         return $this->workflows;
     }

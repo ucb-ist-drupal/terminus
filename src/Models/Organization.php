@@ -17,6 +17,7 @@ use Pantheon\Terminus\Friends\UsersTrait;
 
 /**
  * Class Organization
+ *
  * @package Pantheon\Terminus\Models
  */
 class Organization extends TerminusModel implements
@@ -30,27 +31,39 @@ class Organization extends TerminusModel implements
     use SitesTrait;
     use UsersTrait;
 
-    const PRETTY_NAME = 'organization';
+    public const PRETTY_NAME = 'organization';
+
     /**
      * @var array
      */
     private $features;
+
     /**
      * @var OrganizationSiteMemberships
      */
     private $site_memberships;
+
     /**
      * @var Upstreams
      */
     private $upstreams;
+
     /**
      * @var OrganizationUserMemberships
      */
     private $user_memberships;
+
     /**
      * @var Workflows
      */
     private $workflows;
+
+    /**
+     * @var SiteOrganizationMemberships
+     *
+     * Set by OrganizationJoinTrait.
+     */
+    public $memberships;
 
     /**
      * @return string
@@ -64,12 +77,15 @@ class Organization extends TerminusModel implements
      * Returns a specific organization feature value
      *
      * @param string $feature Feature to check
+     *
      * @return mixed|null Feature value, or null if not found
      */
     public function getFeature($feature)
     {
         if (!isset($this->features)) {
-            $response = $this->request->request("organizations/{$this->id}/features");
+            $response = $this->request->request(
+                "organizations/{$this->id}/features"
+            );
             $this->features = (array)$response['data'];
         }
         if (isset($this->features[$feature])) {
@@ -112,8 +128,14 @@ class Organization extends TerminusModel implements
     public function getSiteMemberships()
     {
         if (empty($this->site_memberships)) {
+            $nickname = \uniqid(__FUNCTION__ . '-');
+            $this->getContainer()->add(
+                $nickname,
+                OrganizationSiteMemberships::class
+            )
+                ->addArgument(['organization' => $this]);
             $this->site_memberships = $this->getContainer()
-                ->get(OrganizationSiteMemberships::class, [['organization' => $this,],]);
+                ->get($nickname);
         }
         return $this->site_memberships;
     }
@@ -124,7 +146,10 @@ class Organization extends TerminusModel implements
     public function getUpstreams()
     {
         if (empty($this->upstreams)) {
-            $this->upstreams = $this->getContainer()->get(OrganizationUpstreams::class, [['organization' => $this,],]);
+            $nickname = \uniqid(__FUNCTION__ . '-');
+            $this->getContainer()->add($nickname, OrganizationUpstreams::class)
+                ->addArgument(['organization' => $this]);
+            $this->upstreams = $this->getContainer()->get($nickname);
         }
         return $this->upstreams;
     }
@@ -135,8 +160,14 @@ class Organization extends TerminusModel implements
     public function getUserMemberships()
     {
         if (empty($this->user_memberships)) {
+            $nickname = \uniqid(__FUNCTION__ . '-');
+            $this->getContainer()->add(
+                $nickname,
+                OrganizationUserMemberships::class
+            )
+                ->addArgument(['organization' => $this]);
             $this->user_memberships = $this->getContainer()
-                ->get(OrganizationUserMemberships::class, [['organization' => $this,],]);
+                ->get($nickname);
         }
         return $this->user_memberships;
     }
@@ -147,7 +178,10 @@ class Organization extends TerminusModel implements
     public function getWorkflows()
     {
         if (empty($this->workflows)) {
-            $this->workflows = $this->getContainer()->get(Workflows::class, [['organization' => $this,],]);
+            $nickname = \uniqid(__FUNCTION__ . '-');
+            $this->getContainer()->add($nickname, Workflows::class)
+                ->addArgument(['organization' => $this]);
+            $this->workflows = $this->getContainer()->get($nickname);
         }
         return $this->workflows;
     }
@@ -162,6 +196,10 @@ class Organization extends TerminusModel implements
      */
     public function serialize()
     {
-        return ['id' => $this->id, 'name' => $this->getName(), 'label' => $this->getLabel(),];
+        return [
+            'id' => $this->id,
+            'name' => $this->getName(),
+            'label' => $this->getLabel(),
+        ];
     }
 }

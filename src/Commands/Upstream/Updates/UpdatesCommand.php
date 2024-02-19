@@ -6,21 +6,26 @@ use Pantheon\Terminus\Commands\TerminusCommand;
 use Pantheon\Terminus\Site\SiteAwareInterface;
 use Pantheon\Terminus\Site\SiteAwareTrait;
 use Pantheon\Terminus\Exceptions\TerminusException;
+use Pantheon\Terminus\Commands\WorkflowProcessingTrait;
 
 /**
- * Class UpdatesCommand
+ * Class UpdatesCommand.
+ *
  * @package Pantheon\Terminus\Commands\Upstream\Updates
  */
 abstract class UpdatesCommand extends TerminusCommand implements SiteAwareInterface
 {
     use SiteAwareTrait;
+    use WorkflowProcessingTrait;
 
     /**
      * Return the upstream for the given site
      *
-     * @param Site $site
+     * @param \Pantheon\Terminus\Models\Environment $env
+     *
      * @return object The upstream information
-     * @throws TerminusException
+     *
+     * @throws \Pantheon\Terminus\Exceptions\TerminusException
      */
     protected function getUpstreamUpdates($env)
     {
@@ -33,9 +38,11 @@ abstract class UpdatesCommand extends TerminusCommand implements SiteAwareInterf
     /**
      * Get the list of upstream updates for a site
      *
-     * @param Site $site
+     * @param \Pantheon\Terminus\Models\Environment $env
+     *
      * @return array The list of updates
-     * @throws TerminusException
+     *
+     * @throws \Pantheon\Terminus\Exceptions\TerminusException
      */
     protected function getUpstreamUpdatesLog($env)
     {
@@ -44,11 +51,24 @@ abstract class UpdatesCommand extends TerminusCommand implements SiteAwareInterf
     }
 
     /**
+     * Check upstream updates for given environment.
+     *
+     * @param \Pantheon\Terminus\Models\Environment $env.
+     */
+    protected function checkUpstreamUpdates($env)
+    {
+        if ($env->isBuildStepEnabled()) {
+            $workflow = $env->getWorkflows()->create('check_upstream_updates');
+            $this->processWorkflow($workflow);
+        }
+    }
+
+    /**
      * Get the list of composer dependency updates for a site environment
      *
-     * @param Environment $env
+     * @param \Pantheon\Terminus\Models\Environment $env
+     *
      * @return array The list of updates
-     * @throws TerminusException
      */
     protected function getComposerUpdatesLog($env)
     {

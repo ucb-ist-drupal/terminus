@@ -3,13 +3,13 @@
 namespace Pantheon\Terminus\Commands\Connection;
 
 use Consolidation\OutputFormatters\StructuredData\PropertyList;
-
 use Pantheon\Terminus\Commands\TerminusCommand;
 use Pantheon\Terminus\Site\SiteAwareInterface;
 use Pantheon\Terminus\Site\SiteAwareTrait;
 
 /**
- * Class InfoCommand
+ * Class InfoCommand.
+ *
  * @package Pantheon\Terminus\Commands\Connection
  */
 class InfoCommand extends TerminusCommand implements SiteAwareInterface
@@ -28,6 +28,7 @@ class InfoCommand extends TerminusCommand implements SiteAwareInterface
      *     sftp_username: SFTP Username
      *     sftp_host: SFTP Host
      *     sftp_password: SFTP Password
+     *     sftp_port: SFTP Port
      *     sftp_url: SFTP URL
      *     git_command: Git Command
      *     git_username: Git Username
@@ -46,16 +47,19 @@ class InfoCommand extends TerminusCommand implements SiteAwareInterface
      *     redis_url: Redis URL
      *     redis_password: Redis Password
      * @default-fields *_command
-     * @return PropertyList
-     *
      * @param string $site_env Site & environment in the format `site-name.env`
+     *
+     * @return PropertyList
      *
      * @usage <site>.<env> Displays connection information for <site>'s <env> environment.
      * @usage <site>.<env> --fields='git_*' Displays connection information fields related to Git for <site>'s <env> environment.
+     *
+     * @throws \Pantheon\Terminus\Exceptions\TerminusException
      */
     public function connectionInfo($site_env)
     {
-        list(, $env) = $this->getSiteEnv($site_env);
+        $env = $this->getEnv($site_env);
+
         return new PropertyList($env->connectionInfo());
     }
 }

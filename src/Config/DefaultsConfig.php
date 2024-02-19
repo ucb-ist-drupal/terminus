@@ -15,6 +15,8 @@ class DefaultsConfig extends TerminusConfig
      */
     protected $source_name = 'Default';
 
+    protected $defaults = [];
+
     /**
      * DefaultsConfig constructor.
      */
@@ -82,7 +84,7 @@ class DefaultsConfig extends TerminusConfig
         $script_name     = str_replace(
             $this->getTerminusRoot() . DIRECTORY_SEPARATOR,
             '',
-            $script_location['file']
+            $script_location['file'] ?? ''
         );
         return $script_name;
     }
@@ -101,7 +103,7 @@ class DefaultsConfig extends TerminusConfig
         $home = getenv('HOME');
         if (!$home) {
             $system = '';
-            if (getenv('MSYSTEM') !== null) {
+            if (getenv('MSYSTEM')) {
                 $system = strtoupper(substr(getenv('MSYSTEM'), 0, 4));
             }
             if ($system != 'MING') {

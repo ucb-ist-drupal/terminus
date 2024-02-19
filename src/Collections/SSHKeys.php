@@ -11,7 +11,7 @@ use Pantheon\Terminus\Models\SSHKey;
  */
 class SSHKeys extends UserOwnedCollection
 {
-    const PRETTY_NAME = 'SSH keys';
+    public const PRETTY_NAME = 'SSH keys';
     /**
      * @var string
      */
@@ -40,11 +40,11 @@ class SSHKeys extends UserOwnedCollection
         $response = $this->request->request(
             'users/' . $this->getUser()->id . '/keys',
             [
-                'form_params' => rtrim(file_get_contents($key_file)),
+                'form_params' => rtrim(file_get_contents($key_file) ?: ''),
                 'method' => 'post',
             ]
         );
-        return (array)$response['data'];
+        return $response;
     }
 
     /**

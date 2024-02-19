@@ -29,9 +29,7 @@ abstract class TerminusCommand implements
     use LoggerAwareTrait;
     use ConfigAwareTrait;
     use ContainerAwareTrait;
-    use IO {
-        io as roboIo;
-    }
+    use IO;
     use SessionAwareTrait;
 
     /**
@@ -82,7 +80,7 @@ abstract class TerminusCommand implements
         foreach ($replacements as $key => $val) {
             $tr['{' . $key . '}'] = $val;
         }
-        $confirm_text = strtr($confirm_text, $tr);
+        $confirm_text = strtr($confirm_text ?? '', $tr);
         return $this->io()->confirm($confirm_text, false);
     }
 }

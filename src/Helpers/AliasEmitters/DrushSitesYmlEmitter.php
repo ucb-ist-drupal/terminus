@@ -8,6 +8,7 @@ class DrushSitesYmlEmitter implements AliasEmitterInterface
 {
     protected $base_dir;
     protected $home;
+    protected $target_name;
 
     public function __construct($base_dir, $home, $target_name = 'pantheon')
     {
@@ -28,6 +29,8 @@ class DrushSitesYmlEmitter implements AliasEmitterInterface
 
     /**
      * {@inheritdoc}
+     *
+     * @throws \Pantheon\Terminus\Exceptions\TerminusException
      */
     public function write(array $alias_replacements)
     {
@@ -54,7 +57,7 @@ class DrushSitesYmlEmitter implements AliasEmitterInterface
         }
         $drushConfigFiltered['drush']['paths']['alias-path'][] = '${env.home}/.drush/sites';
         $drushConfigFiltered['drush']['paths']['alias-path'][] =
-            str_replace($this->home, '${env.home}', $pantheon_sites_dir);
+            str_replace($this->home ?? '', '${env.home}', $pantheon_sites_dir ?? '');
         $drushConfigFiltered['drush']['paths']['include'][] = '${env.home}/.drush/pantheon';
         $drushYmlEditor->writeDrushConfig($drushConfigFiltered);
 
@@ -66,7 +69,7 @@ class DrushSitesYmlEmitter implements AliasEmitterInterface
             $fs->mkdir($policyToPath);
         }
         $policyTemplate = new Template();
-        $copied = $policyTemplate->copy($policyFromPath, $policyToPath);
+        $policyTemplate->copy($policyFromPath, $policyToPath);
     }
 
     /**
@@ -77,7 +80,10 @@ class DrushSitesYmlEmitter implements AliasEmitterInterface
      */
     protected function filterForSites($line)
     {
-        if ((strpos($line, 'pantheon') !== false) || (strpos($line, '/.drush/sites') !== false)) {
+        if (
+            strpos($line ?? '', 'pantheon') !== false
+            || strpos($line ?? '', '/.drush/sites') !== false
+        ) {
             return false;
         }
         return true;
@@ -87,11 +93,14 @@ class DrushSitesYmlEmitter implements AliasEmitterInterface
      * Return the data for one alias record, and run the replacements on it.
      *
      * @param array $replacements
+     *
      * @return string
+     *
+     * @throws \Pantheon\Terminus\Exceptions\TerminusException
      */
     protected function getAliasFragment(array $replacements)
     {
-        return Template::process('fragment.site.yml.tmpl', $replacements);
+        return Template::process('fragment.site.yml.twig', $replacements);
     }
 
     /**

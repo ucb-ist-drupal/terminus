@@ -1,13 +1,282 @@
 # Change Log
 All notable changes to this project will be documented in this file. This project adheres to [Semantic Versioning](http://semver.org)
 
-## 2.5.0 - 2021-01-19
+## 3.3.3 - 2024-01-11
+
+### Fixed
+
+- Undefined variable notice for defaultMaxRetries (#2529)
+
+## 3.3.2 - 2024-01-11
+
+### Fixed
+
+- Fix fatal error on payment methods (#2522)
+
+### Changed
+
+- Avoid hitting APIs so hard (#2523)
+
+## 3.3.1 - 2023-11-30
+
+- No changes, just retagged because of improper version numbering.
+
+## 3.3.0 - 2023-11-29
+
+- PHP 8.3 compatibility (#2555)
+- Misc 8.2 deprecations
+
+
+## 3.2.2 - 2023-09-28
+
+### Fixed
+
+- Return empty string on zero dates (#2494)
+- Catch down network exception and non-object responses in fetch (#2492)
+
+### Added
+
+- New org:info command (#2472)
+- Commands trace metadata (#2461)
+
+### Changed
+
+- Add retry and delay options for env:wake command (#2498)
+- More specific description in env:code-rebuild (#2488)
+
+
+## 3.2.1 - 2023-06-01
+
+### Fixed
+- Fix bug where `env:clone-content` command was not working Drupal sites (#2469)
+- Fix bug where `env:clone-content` command was not working WordPress sites (#2471)
+- Fix passthrough exit code from drush and wp-cli (#2470)
+
+## 3.2.0 - 2023-05-22
+
+### Added
+
+- New env:rebuild-code command (#2417)
+- Validation for aliases command (#2447)
+
+### Fixed
+- Bug with multidev:delete when ids are numbers-only (#2462)
+
+### Changed
+- Add upstream label field to site:info (#2455)
+- Do not check for user membership to remove supporting org (#2453)
+- Improve error messages on error 5xx (#2454)
+- Add search and replace to env:clone-content command for WordPress sites (#2448)
+- Deprecate getSite with param (#2449)
+
+## 3.1.5 - 2023-04-06
+
+### Added
+- New env:rotate-random-seed command (#2444)
+
+## 3.1.4 - 2023-03-01
+
+### Added
+- Multiple tag filter support for org:site:list command (#2360)
+- Workflow wait command added as a copy of existing command in Build Tools plugin (#2435)
+
+### Fixed
+- Cache clear option is now used in the env:deploy command (#2432)
+
+### Changed
+
+- PHP compatibility errors are written to stderr instead of stdout (#2434)
+- Description for database import command (#2436)
+- Description for workflow:info:logs command (#2439)
+- Description for aliases command (#2438)
+
+## 3.1.3 - 2023-02-01
+
+### Added
+- Add SFTP Port as an available field for connection:info (#2420)
+
+### Fixed
+- Fix env var for db name in connection:info (#2427)
+- Library updates to fix compatibility issues with php 8.2 (#2430)
+
+## 3.1.2 - 2023-01-03
+
+### Added
+- PHP 8.2 compatibility (#2414)
+
+### Changed
+- Documentation for import:site command (#2410)
+- Database and cache connection information is now fetched from env vars (#2403)
+
+## 3.1.1 - 2022-11-08
+
+### Changed
+- Update plan:set docs to sku instead of id (#2407)
+
+### Fixed
+- Remove Kint from terminus (#2405)
+- Site:org:add should not need user org membership if a label is provided (#2404)
+- Look for status code in ssh-key:add response (#2406)
+
+## 3.1.0 - 2022-10-17
+
+### Added
+- Added new cache-hit/miss ratio in the cache commands (#2399)
+
+### Fixed
+- Fix deprecation notice in dependency on PHP 8.1 (#2397)
+
+## 3.0.9 - 2022-10-06
+
+### Changed
+- Verbose option description to make it clearer (#2383)
+
+### Fixed
+- Terminus plugin manager composer commands should not be affected by current directory (#2386)
+- Omit reload warning if running reload command (#2388)
+- Deprecation warnings on PHP 8.1 (#2391)
+
+## 3.0.8 - 2022-08-22
+
+### Changed
+- Install plugins can now be done from git url (#2362)
+
+### Fixed
+- Make sure local:clone gets the right branch (#2375)
+- Plugin update should work without args or with 'all' args (#2369)
+- Make backup:restore command work with element = all (#2381)
+
+## 3.0.7 - 2022-03-29
+
+### Changed
+- Change alias for local:commitAndPush to lcp to avoid aliases conflict (#2341)
+- Make framework value more human friendly for site:info command (#2351)
+
+### Fixed
+- Check upstream updates before getting upstream status to get composer updates info (#2349)
+- Fix bug that didn't allow merging a multidev env with only numbers in the name (#2350)
+
+## 3.0.6 - 2022-02-18
+
+### Changed
+- Make upstream status report on composer updates (#2338)
+
+### Fixed
+- Fix bug where `self:console` was not working because psy/psysh was a dev dependency. (#2332)
+- Pin to league/container ^3 to avoid fatal errors (#2337)
+
+## 3.0.5 - 2022-02-08
+
+### Added
+- Added the `--element` usage for `backup:create` (#2317)
+- Add GitHub Pull Request Template and move Issue Template (#2325)
+
+### Changed
+- Replace git:// urls with https:// urls (#2319)
+
+### Fixed
+- Fix bug where `site:list` was unable to properly filter by tags when part of site team (#2316)
+- Fix bug where `--simulate` option was being ignored (#2321)
+- Fix bug where `site:delete` command always fails (#2324)
+- Fix bug where `self:update` reports it only works with the phar version of Terminus (#2328)
+
+## 3.0.4 - 2022-01-18
+
+### Added
+- Added self:plugin:migrate command (#2299)
+- Add php 8.1 support (#2295)
+
+### Changed
+- Set memory limit with ini_set() rather than /usr/bin/env -S (#2303)
+- Optimize Terminus phar build (#2307)
+- Do not require composer/composer as a direct dependency of Terminus (#2308)
+- Avoid dependency on ext-curl in Terminus (#2310)
+- Improve error verbosity in `Sites::get()` (#2311)
+- Retry API request on "Connection refused" and "Operation timed out" errors (#2313)
+
+### Fixed
+- self:update command should now work when plugins have been installed (#2297)
+- Fix filestore scandir problem (#2309)
+
+## 3.0.3 - 2021-12-17
+
+### Fixed
+- Fix PHP 7.4 regressions and revert PHP 8.1 support. PHP 8.1 support will be restored in a future release (#2292)
+
+## 3.0.2 - 2021-12-17
+
+### Added
+- Add aliases for Terminus plugin commands (#2274)
+- Add PHP 8.1 support (#2284)
+
+### Changed
+- Allow upstream:updates:apply to default to dev environment if no environment explicitly provided (#2282)
+
+### Fixed
+- Change env:wake to use https on the platform domain (#2283)
+- Minor fixup to help output of dashboard:view and self:console (#2277)
+
+## 3.0.1 - 2021-12-08
+
+### Fixed
+- Change file name in deploy script (#2270)
+
+## 3.0.0 - 2021-12-08
+
+### Added
+- Look up host for 'terminus drush' / 'terminus wp' commands via an alternate nameserver, if selected (#2253)
+- Typehint param and return value in lookupHostViaAlternateNameserver (#2253)
+- Symfony Library updates (5.x)
+- Adds plugin manager, contributed by [Ed Reel](https://github.com/uberhacker) (#2054)
+    - New command `self:plugin:install` to install Terminus plugins.
+    - New command `self:plugin:list` to list installed Terminus plugins.
+    - New command `self:plugin:search` to locate Terminus plugins to install.
+    - New command `self:plugin:uninstall` to uninstall Terminus plugins.
+    - New command `self:plugin:update` to update already-installed Terminus plugins.
+
+### Changed
+- Update auth:login command so that to not produce a false negative on successful login (#2231)
+- Update CODEOWNERS per 2.x branch (#2243)
+- Update composer dependencies version variable in post-update script (#2239)
+- Update phar builder and package dependencies (#2255)
+- Show dependencies warning if folder does not exist (#2239)
+- Implement cleanupOldDependenciesFolders function after running dependencies update (#2239)
+- Update terminusPluginsDependenciesVersion var comment (#2239)
+- Update warning message text (#2239)
+- Print warning only if terminus has plugins (#2239)
+- Improve hasPlugins, factory, and cleanupOldDependenciesFolders functions (#2239)
+- Return json_decode as array (#2239)
+- Restore openUrl function from LocalMachineHelper (#2248)
+- Draft debian linux packaging (#2255, #2238)
+- Update version compatibility check and messaging (#2267)
+
+### Removed
+- Remove code related to D9ify (#2246)
+
+### Fixed
+- Fix SavedTokens::getData() on auth:login (#2231)
+- Fix failing SSHKeyCommandsTest (#2231)
+- Fix fatal error in Environment::cacheserverConnectionInfo() (#2242)
+- Fix issue with Phar builder as well as DEB dependencies (#2255)
+- Fix coding standards (#2239)
+
+## 2.6.0 - 2021-06-04
+
+### Added
+- `daily-ttl` and `weekly-ttl` options have been added to `Backups::setBackupSchedule()`. (#2133)
+- `keep-for` option has been added to `backup:automatic:schedule`. (#2133)
+- `expiry` information added to the output of `backup:automatic:info`. (#2133)
+
+## 2.5.0 - 2021-01-20
 ### Added
 - `getUsername` added to `Binding` model to retrieve the username for a connection. (#2107)
 
 ### Changed
 - `upstream:updates:apply` now applies Composer changes in addition to upstream changes. (#2089)
 - Connection usernames are no longer "pantheon" but derived from API data. (#2107)
+
+### Fixed
+- Fixed issue where `plan:info` receives a 404 error. (#2098)
 
 ## 2.4.1 - 2020-09-08
 ### Changed

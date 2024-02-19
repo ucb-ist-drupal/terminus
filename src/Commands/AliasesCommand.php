@@ -2,17 +2,13 @@
 
 namespace Pantheon\Terminus\Commands;
 
-use Pantheon\Terminus\Commands\TerminusCommand;
-
-use Pantheon\Terminus\Collections\Sites;
+use Pantheon\Terminus\Config\ConfigAwareTrait;
 use Pantheon\Terminus\Site\SiteAwareInterface;
 use Pantheon\Terminus\Site\SiteAwareTrait;
-
-use Pantheon\Terminus\Helpers\AliasEmitters\AliasCollection;
-use Pantheon\Terminus\Helpers\AliasEmitters\AliasData;
 use Pantheon\Terminus\Helpers\AliasEmitters\AliasesDrushRcEmitter;
 use Pantheon\Terminus\Helpers\AliasEmitters\PrintingEmitter;
 use Pantheon\Terminus\Helpers\AliasEmitters\DrushSitesYmlEmitter;
+use Pantheon\Terminus\Exceptions\TerminusException;
 
 /**
  * Generate lots of aliases
@@ -20,9 +16,12 @@ use Pantheon\Terminus\Helpers\AliasEmitters\DrushSitesYmlEmitter;
 class AliasesCommand extends TerminusCommand implements SiteAwareInterface
 {
     use SiteAwareTrait;
+    use ConfigAwareTrait;
 
     /**
      * Generates Pantheon Drush aliases for sites on which the currently logged-in user is on the team.
+     * Note that Drush 9 does not read alias files from global locations. You must set valid alias locations in your drush.yml file.
+     * Refer to https://docs.pantheon.io/guides/drush/drush-aliases#manage-available-site-aliases-lists for more information.
      *
      * @authorize
      *
@@ -58,6 +57,10 @@ class AliasesCommand extends TerminusCommand implements SiteAwareInterface
         // Be forgiving about the spelling of 'yaml'
         if ($options['type'] == 'yaml') {
             $options['type'] = 'yml';
+        }
+
+        if ($options['type'] === 'yml' && !empty($options['location'])) {
+            throw new TerminusException('The --location option is not compatible with --type=yml.');
         }
 
         $this->log()->notice("Fetching site information to build Drush aliases...");
@@ -97,13 +100,22 @@ class AliasesCommand extends TerminusCommand implements SiteAwareInterface
         $emitters = [];
 
         if ($this->emitterTypeMatches($emitterType, 'print', false)) {
-            $emitters[] = new PrintingEmitter($this->output());
+            $print_nickname = \uniqid(__METHOD__);
+            $this->getContainer()->add($print_nickname, PrintingEmitter::class)
+                ->addArguments([$this->output()]);
+            $emitters[] = $this->getContainer()->get($print_nickname);
         }
         if ($this->emitterTypeMatches($emitterType, 'php')) {
-            $emitters[] = new AliasesDrushRcEmitter($location, $base_dir);
+            $php_nickname = \uniqid(__METHOD__);
+            $this->getContainer()->add($php_nickname, AliasesDrushRcEmitter::class)
+                ->addArguments([$location, $base_dir]);
+            $emitters[] = $this->getContainer()->get($php_nickname);
         }
         if ($this->emitterTypeMatches($emitterType, 'yml')) {
-            $emitters[] = new DrushSitesYmlEmitter($base_dir, $home, $target_name);
+            $yml_nickname = \uniqid(__METHOD__);
+            $this->getContainer()->add($yml_nickname, DrushSitesYmlEmitter::class)
+                ->addArguments([$base_dir, $home, $target_name]);
+            $emitters[] = $this->getContainer()->get($yml_nickname);
         }
 
         return $emitters;
@@ -130,10 +142,10 @@ class AliasesCommand extends TerminusCommand implements SiteAwareInterface
 
         return array_map(function ($siteInfo) {
             return [
-                '{{site_name}}' => $siteInfo['name'],
-                '{{env_name}}' => '*',
-                '{{env_label}}' => '${env-name}',
-                '{{site_id}}' => $siteInfo['id'],
+                'site_name' => $siteInfo['name'],
+                'env_name' => '*',
+                'env_label' => '${env-name}',
+                'site_id' => $siteInfo['id'],
             ];
         }, $site_data);
     }
@@ -236,6 +248,6 @@ class AliasesCommand extends TerminusCommand implements SiteAwareInterface
      */
     protected function shortenHomePath($message)
     {
-        return str_replace($this->getConfig()->get('user_home'), '~', $message);
+        return str_replace($this->getConfig()->get('user_home') ?? '', '~', $message ?? '');
     }
 }

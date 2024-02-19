@@ -66,7 +66,7 @@ class ListCommand extends TerminusCommand
     {
         if (isset($options['framework']) && !is_null($framework = $options['framework'])) {
             $upstreams->filter(function ($upstream) use ($framework) {
-                return $upstream->get('framework') === strtolower($framework);
+                return $upstream->get('framework') === strtolower($framework ?? '');
             });
         }
         return $upstreams;
@@ -90,7 +90,7 @@ class ListCommand extends TerminusCommand
      */
     protected function filterForCoreCustom($upstreams, $options = [])
     {
-        if (!(isset($options['all']) && (boolean)$options['all'])) {
+        if (!(isset($options['all']) && (bool)$options['all'])) {
             $upstreams->filter(function ($upstream) {
                 return in_array($upstream->get('type'), ['core', 'custom',]);
             });

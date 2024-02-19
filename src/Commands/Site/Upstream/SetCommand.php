@@ -15,7 +15,7 @@ class SetCommand extends SiteCommand
     use WorkflowProcessingTrait;
 
     /**
-     * Changes a site's upstream.
+     * Changes a site upstream.
      *
      * @authorize
      *
@@ -23,13 +23,12 @@ class SetCommand extends SiteCommand
      *
      * @param string $site_name Site name
      * @param string $upstream_id Upstream name or UUID
-     * @throws \Pantheon\Terminus\Exceptions\TerminusNotFoundException
      *
      * @usage <site> <upstream_id> Updates <site>'s upstream to <upstream_id>.
      */
     public function set($site_name, $upstream_id)
     {
-        $site = $this->getSite($site_name);
+        $site = $this->getSiteById($site_name);
         if (!$site->getAuthorizations()->can('switch_upstream')) {
             throw new TerminusException('You do not have permission to change the upstream of this site.');
         }

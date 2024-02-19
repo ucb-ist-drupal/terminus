@@ -7,17 +7,19 @@
 ---
 
 # App
-TERMINUS_VERSION: '2.5.0'
+TERMINUS_VERSION: '3.3.3'
 
 # Connectivity
-TERMINUS_HOST:      'terminus.pantheon.io'
-TERMINUS_HOST_CERT: null
-TERMINUS_PORT:      443
-TERMINUS_PROTOCOL:  'https'
-TERMINUS_SSH_HOST:  null
+TERMINUS_HOST:        'terminus.pantheon.io'
+TERMINUS_HOST_CERT:   null
+TERMINUS_PORT:        443
+TERMINUS_PROTOCOL:    'https'
+TERMINUS_SSH_HOST:    null
+TERMINUS_SSH_COMMAND: 'ssh'
 
 # Settings
 TERMINUS_TIMEOUT: 86400
+TERMINUS_PLUGINS_FALLBACK_COMPATIBILITY: '2.6.1'
 
 # User Prompts
 TERMINUS_DASHBOARD_HOST:     'dashboard.pantheon.io'
@@ -29,11 +31,18 @@ TERMINUS_MONETARY_FORMAT: '$%01.2f'
 TERMINUS_TIME_ZONE:       'UTC'
 
 # File Storage
-TERMINUS_CACHE_DIR:         '[[ TERMINUS_USER_HOME ]]/.terminus/cache'
-TERMINUS_PLUGINS_DIR:       '[[ TERMINUS_USER_HOME ]]/.terminus/plugins'
-TERMINUS_COMMAND_CACHE_DIR: '[[ TERMINUS_CACHE_DIR ]]/commands'
-TERMINUS_TOKENS_DIR:        '[[ TERMINUS_CACHE_DIR ]]/tokens'
-TERMINUS_ASSETS_DIR:        '[[ TERMINUS_ROOT ]]/assets'
+TERMINUS_PLUGINS_DIR_BASENAME:  'plugins-3.x'
+TERMINUS_BASE_DIR:              '[[ TERMINUS_USER_HOME ]]/.terminus'
+TERMINUS_CACHE_DIR:             '[[ TERMINUS_BASE_DIR ]]/cache'
+TERMINUS_PLUGINS_DIR:           '[[ TERMINUS_BASE_DIR ]]/[[ TERMINUS_PLUGINS_DIR_BASENAME ]]'
+TERMINUS_PLUGINS2_DIR:          '[[ TERMINUS_BASE_DIR ]]/plugins'
+TERMINUS_DEPENDENCIES_BASE_DIR: '[[ TERMINUS_BASE_DIR ]]/terminus-dependencies'
+TERMINUS_COMMAND_CACHE_DIR:     '[[ TERMINUS_CACHE_DIR ]]/commands'
+TERMINUS_TOKENS_DIR:            '[[ TERMINUS_CACHE_DIR ]]/tokens'
+TERMINUS_ASSETS_DIR:            '[[ TERMINUS_ROOT ]]/assets'
+TERMINUS_LOCAL_COPIES:          '[[ TERMINUS_USER_HOME ]]/pantheon-local-copies'
+TERMINUS_PHAR_FILE:             '[[ TERMINUS_USER_HOME ]]/terminus'
+TERMINUS_EXECUTABLE:            '[[ TERMINUS_USER_HOME ]]/bin/terminus'
 
 # Helpers
 TERMINUS_USER: null
@@ -43,6 +52,11 @@ TERMINUS_ORG:  null
 
 # Region
 TERMINUS_COMMAND_SITE_OPTIONS_REGION: null
+
+# Package Settings
+TERMINUS_BREW_TAP:               '*** TBD ***'
+TERMINUS_BREW_PACKAGE:           'pantheon-systems/external/terminus'
+TERMINUS_DEBIAN_PACKAGE_INSTALL: '*** TBD ***'
 
 # Testing
 TERMINUS_TEST_MODE:    false
@@ -54,3 +68,8 @@ TERMINUS_VCR_MODE:     null
 # TERMINUS_PHP
 # TERMINUS_ROOT
 # TERMINUS_SCRIPT
+
+# Debug Guzzle Calls here:
+TERMINUS_CLIENT_OPTIONS:
+  debug: false
+  http_errors: false

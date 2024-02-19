@@ -9,7 +9,8 @@ use Pantheon\Terminus\Site\SiteAwareTrait;
 use Pantheon\Terminus\Exceptions\TerminusException;
 
 /**
- * Class SetCommand
+ * Class SetCommand.
+ *
  * @package Pantheon\Terminus\Commands\Connection
  */
 class SetCommand extends TerminusCommand implements SiteAwareInterface
@@ -17,8 +18,8 @@ class SetCommand extends TerminusCommand implements SiteAwareInterface
     use SiteAwareTrait;
     use WorkflowProcessingTrait;
 
-    const COMMIT_ADVICE = 'If you wish to save these changes, use `terminus env:commit {site_env}`.';
-    const UNCOMMITTED_CHANGE_WARNING =
+    public const COMMIT_ADVICE = 'If you wish to save these changes, use `terminus env:commit {site_env}`.';
+    public const UNCOMMITTED_CHANGE_WARNING =
         'This environment has uncommitted changes. Switching the connection mode will discard this work.';
 
     /**
@@ -37,12 +38,12 @@ class SetCommand extends TerminusCommand implements SiteAwareInterface
      */
     public function connectionSet($site_env, $mode)
     {
-        list(, $env) = $this->getSiteEnv($site_env);
-
-        if (in_array($env->id, ['test', 'live',])) {
+        $env = $this->getEnv($site_env);
+        $envName = $env->getName();
+        if (in_array($envName, ['test', 'live',])) {
             throw new TerminusException(
                 'Connection mode cannot be set on the {env} environment',
-                ['env' => $env->id,]
+                ['env' => $envName]
             );
         }
         if ($env->hasUncommittedChanges()) {
@@ -50,16 +51,18 @@ class SetCommand extends TerminusCommand implements SiteAwareInterface
                 self::UNCOMMITTED_CHANGE_WARNING . ' ' . self::COMMIT_ADVICE,
                 compact('site_env')
             );
-            if (!$this->confirm(
-                'Are you sure you want to change the connection mode of {env}?',
-                ['env' => $env->id,]
-            )) {
+            if (
+                !$this->confirm(
+                    'Are you sure you want to change the connection mode of {env}?',
+                    ['env' => $envName]
+                )
+            ) {
                 return;
             }
         }
 
         try {
-            $mode = strtolower($mode);
+            $mode = strtolower($mode ?? '');
             $workflow = $env->changeConnectionMode($mode);
         } catch (TerminusException $e) {
             $message = $e->getMessage();

@@ -17,7 +17,7 @@ class SetCommand extends TerminusCommand implements SiteAwareInterface
     use WorkflowProcessingTrait;
 
     /**
-     * Upgrades or downgrades a site's service level.
+     * Upgrades or downgrades a site service level.
      *
      * @deprecated 2.0.0 This will be removed in the future. Please use plan:set and plan:list instead.
      *
@@ -29,10 +29,12 @@ class SetCommand extends TerminusCommand implements SiteAwareInterface
      * @param string $level [free|basic|pro|business] Service level
      *
      * @usage <site> <service_level> Updates <site>'s service level to <service_level>.
+     *
+     * @throws \Pantheon\Terminus\Exceptions\TerminusException
      */
     public function set($site_id, $level)
     {
-        $site = $this->getSite($site_id);
+        $site = $this->getSiteById($site_id);
         $workflow = $site->updateServiceLevel($level);
         $this->log()->notice('Setting plan of "{site_id}" to "{level}".', compact('site_id', 'level'));
         $this->processWorkflow($workflow);

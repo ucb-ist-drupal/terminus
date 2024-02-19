@@ -11,8 +11,9 @@ Setting Up
 
 1. Clone this Git repository on your local machine.
 2. Install [Composer](https://getcomposer.org/) if you don't already have it.
-3. Run `composer install` to fetch all the dependencies.
-4. Run `./bin/terminus --help` to test that everything was installed properly.
+3. Install [Box](https://github.com/box-project/box) if not already installed.
+4. Run `composer install` to fetch all the dependencies.
+5. Run `./bin/terminus --help` to test that everything was installed properly.
 
 Submitting Patches
 ------------------
@@ -26,7 +27,7 @@ Whether you want to fix a bug or implement a new feature, the process is pretty 
 
 It doesn't matter if the code isn't perfect. The idea is to get it reviewed early and iterate on it.
 
-If you're adding a new feature, please add one or more functional tests for it in the `tests/features/` directory. See below. Also, keep the documentation up-to-date by running:
+If you're adding a new feature, please add one or more functional tests for it in the `tests/Functional/` directory. See below. Also, keep the documentation up-to-date by running:
 
   ```bash
   cd /install/location/terminus
@@ -45,73 +46,45 @@ The PHP code beautifier can automatically fix a number of style issues. Run it v
   composer cbf
   ```
 
+Building the PHAR
+-------------------------
+
+Terminus is built into a PHAR package using [Box](https://github.com/box-project/box), which must
+be installed first.
+
+From the root directory, build the package with:
+
+`composer build`
+
+This `terminus.phar` file is required to be built prior to running tests. Running the build will
+first clear out dev dependencies that were added via `composer install` and those will need to be
+reinstalled before continuing development.
+
 Running and Writing Tests
 -------------------------
 
-There are two types of automated tests:
+Terminus uses functional tests implemented using [PHPUnit](http://phpunit.de/)
 
-* unit tests, implemented using [PHPUnit](http://phpunit.de/)
-* functional tests, implemented using [Behat](http://behat.org)
+A `.env` file is required which can be based on `.env.dist` and must contain a site name for testing
+which has a paid plan enabled for multidev, specify an environment to use for the tests, a user
+account that owns that site, a machine token (TERMINUS_TOKEN) for that user, and an organization.
 
-Both the unit and functional tests can be run together via:
-
-`composer test`
-
-### Unit Tests
-
-The unit test files are in the `tests/unit-tests` directory.
-
-To run the unit tests for Terminus 0.x, simply execute:
-
-  `vendor/bin/phpunit`
-  
-The Terminus 1.x unit tests can be run via:
-
-  ```bash
-  cd /install/location/terminus
-  composer phpunit
-  ```
-
+A PHAR file must also be built before running tests.
 
 ### Functional Tests
 
-The functional test files are in the `tests/features` directory. Any test which touches the backed is mocked with [VCR](http://php-vcr.github.io).
+The functional test files are in the `tests/Functional` directory.
 
-#### Running existing tests
-
-To run the entire test suite for Terminus 0.x:
-
-  `vendor/bin/behat --config tests/config/behat.yml`
-
-Or to test a single feature:
-
-  `vendor/bin/behat --config tests/config/behat.yml tests/features/core.feature`
-
-The functional test files for the new version of Terminus are in the `tests/active-features` directory. The complete behat suite for Terminus 1.x can be run via:
+The Terminus 3.x functional tests can be run via:
 
   ```bash
   cd /install/location/terminus
-  composer behat
+  composer test:functional
   ```
 
-More information can be found by running `vendor/bin/behat --help`.
-
-#### Recording new tests
-
-To record a new test, configure the `parameters` section of the file [tests/config/behat.yml](tests/config/behat.yml) as follows:
-```
-parameters:
-  user_id:                 '[[YOUR-USER-ID-HERE]]'
-  username:                '[[YOUR-EMAIL-ADDRESS-HERE]]'
-  host:                    'terminus.pantheon.io:443'
-  vcr_mode:                'new_episodes'
-  machine_token:           '[[YOUR-MACHINE-TOKEN-HERE]]'
-```
-Then, run a single test as described above. VCR will then call the backend and record the results received in the specified .yml file. This is done for any Behat scenario labeled `@vcr filename.yml`. Pick a filename appropriate for the test.
-
-Once the VCR .yml file has been saved, you may restore your behat.yml configuration file to its previous state (at a minimum, set `vcr_mode` back to `none`). Subsequent test runs will pull data from the VCR .yml file to satisfy future web requests.
-
-You may need to add yourself to the [team of the behat-tests site](https://admin.dashboard.pantheon.io/sites/e885f5fe-6644-4df6-a292-68b2b57c33ad#dev/code) (Pantheon employees) or use a different test site. Once you have captured the events you would like to record, hand-sanitize them of any sensitive information such as machine tokens and bearer authorization headers.
+This will take some time to complete and will produce a report at the end with any failed or
+skipped tests. To run a specific test, find the test's group in the comments above the test and
+use the command specified in `composer.json` under `test:functional` with `--group=<the-group>`
 
 Versioning
 ----------

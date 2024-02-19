@@ -9,7 +9,8 @@ use Pantheon\Terminus\Site\SiteAwareTrait;
 use Pantheon\Terminus\Exceptions\TerminusException;
 
 /**
- * Class SiteCommand
+ * Class SiteCommand.
+ *
  * @package Pantheon\Terminus\Commands\Import
  */
 class SiteCommand extends TerminusCommand implements SiteAwareInterface
@@ -27,15 +28,23 @@ class SiteCommand extends TerminusCommand implements SiteAwareInterface
      *
      * @param string $site_name Site name
      * @param string $url Publicly accessible URL of the site archive
-     *
+     *                    exported with drush 8 archive-dump command.
+     *                    If you need to import a site in Drupal >=9 consider conversion:import-site command from https://github.com/pantheon-systems/terminus-conversion-tools-plugin
      * @usage <site_name> <url> Imports the site archive at <url> to <site_name>.
+     *
+     * @throws \Pantheon\Terminus\Exceptions\TerminusException
      */
     public function import($site_name, $url)
     {
-        list($site, $env) = $this->getSiteEnv($site_name, 'dev');
+        $site = $this->getSiteById($site_name);
+        $env = $site->getEnvironments()->get('dev');
 
-        $tr = ['site' => $site->getName(), 'env' => $env->getName()];
-        if (!$this->confirm('Are you sure you overwrite the code, database and files for {env} on {site}?', $tr)) {
+        if (
+            !$this->confirm(
+                'Are you sure you overwrite the code, database and files for {env} on {site}?',
+                ['site' => $site->getName(), 'env' => $env->getName()]
+            )
+        ) {
             return;
         }
 
