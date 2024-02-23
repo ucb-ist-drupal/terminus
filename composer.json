@@ -13,7 +13,6 @@
   "minimum-stability": "stable",
   "prefer-stable": true,
   "require": {
-    "cweagans/composer-patches": "~1.0",
     "composer/semver": "^1.4",
     "php": ">=7.4",
     "ext-json": "*",
