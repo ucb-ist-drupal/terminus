@@ -500,9 +500,9 @@ EOD;
      */
     private function startVCR(array $options = ['cassette' => 'tmp', 'mode' => 'none',])
     {
-      if (getenv('WPS_VCR_PATH')) {
-          VCR::configure()->setCassettePath(getenv('WPS_VCR_PATH'));
-          VCR::configure()->enableLibraryHooks(['curl']);
+        if (getenv('WPS_VCR_PATH')) {
+            VCR::configure()->setCassettePath(getenv('WPS_VCR_PATH'));
+            VCR::configure()->enableLibraryHooks(['curl']);
         }
         VCR::configure()->enableRequestMatchers(['method', 'url', 'body']);
         VCR::configure()->setMode($options['mode']);
