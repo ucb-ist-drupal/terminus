@@ -17,12 +17,14 @@ class ListCommand extends SiteCommand
      *
      * @authorize
      * @filter-output
+     * @interact
      *
      * @command site:list
      * @aliases sites
      *
      * @field-labels
      *     name: Name
+     *     label: Label
      *     id: ID
      *     plan_name: Plan
      *     framework: Framework

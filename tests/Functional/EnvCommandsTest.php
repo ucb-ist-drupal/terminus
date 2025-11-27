@@ -61,6 +61,26 @@ class EnvCommandsTest extends TerminusTestBase
      */
     public function testDeployCommand()
     {
+
+        // Test that the command works when plugins are not installed.
+        [$output, $exitCode, $error] = static::callTerminus(
+            sprintf('env:deploy %s.%s', $this->getSiteName(), $this->getMdEnv()),
+            null,
+            $this->env
+        );
+
+        $this->assertNotEquals(
+            0,
+            $exitCode,
+            'env:deploy should fail if a multidev environment is given'
+        );
+
+        $this->assertStringContainsString(
+            'This command should only be used to deploy to test or live environments',
+            $error,
+            'env:deploy should fail if a multidev environment is given'
+        );
+
         $this->terminus(
             sprintf('env:deploy %s.%s', $this->getSiteName(), 'live')
         );
@@ -290,6 +310,34 @@ class EnvCommandsTest extends TerminusTestBase
             $envInfo,
             'Environment info should have "php_version" field.'
         );
+        $this->assertArrayHasKey(
+            'php_runtime_generation',
+            $envInfo,
+            'Environment info should have "php_runtime_generation" field.'
+        );
+    }
+
+    /**
+     * @test
+     * @covers \Pantheon\Terminus\Commands\Env\InfoCommand
+     *
+     * @group env
+     * @group short
+     */
+    public function testInfoCommandWithDrushVersion()
+    {
+        $envInfo = $this->terminusJsonResponse(
+            sprintf('env:info %s --fields=drush_version', $this->getSiteEnv())
+        );
+        $this->assertArrayHasKey(
+            'drush_version',
+            $envInfo,
+            'Environment info should have "drush_version" field when explicitly requested.'
+        );
+        $this->assertNotEmpty(
+            $envInfo['drush_version'],
+            'Environment info "drush_version" should not be empty.'
+        );
     }
 
     /**
@@ -434,6 +482,60 @@ class EnvCommandsTest extends TerminusTestBase
 
     /**
      * @test
+     * @covers \Pantheon\Terminus\Commands\Env\ListCommand
+     *
+     * @group env
+     * @group short
+     */
+    public function testListCommandWithPHPRuntimeGeneration()
+    {
+        $envs = $this->terminusJsonResponse(
+            sprintf('env:list %s --fields=id,php_runtime_generation', $this->getSiteName())
+        );
+        $this->assertIsArray($envs);
+        $env = array_shift($envs);
+
+        $this->assertArrayHasKey(
+            'id',
+            $env,
+            'An environment should have "id" field.'
+        );
+        $this->assertArrayHasKey(
+            'php_runtime_generation',
+            $env,
+            'An environment should have "php_runtime_generation" field when explicitly requested.'
+        );
+    }
+
+    /**
+     * @test
+     * @covers \Pantheon\Terminus\Commands\Env\ListCommand
+     *
+     * @group env
+     * @group short
+     */
+    public function testListCommandWithPHPVersion()
+    {
+        $envs = $this->terminusJsonResponse(
+            sprintf('env:list %s --fields=id,php_version', $this->getSiteName())
+        );
+        $this->assertIsArray($envs);
+        $env = array_shift($envs);
+
+        $this->assertArrayHasKey(
+            'id',
+            $env,
+            'An environment should have "id" field.'
+        );
+        $this->assertArrayHasKey(
+            'php_version',
+            $env,
+            'An environment should have "php_version" field when explicitly requested.'
+        );
+    }
+
+    /**
+     * @test
      * @covers \Pantheon\Terminus\Commands\Env\ViewCommand
      *
      * @group env
@@ -450,5 +552,19 @@ class EnvCommandsTest extends TerminusTestBase
             $this->getSiteName()
         );
         $this->assertEquals($expectedUrl, $url);
+    }
+
+    /**
+     * @test
+     * @covers \Pantheon\Terminus\Commands\Env\CodeRebuildCommand
+     *
+     * @group env
+     * @group short
+     */
+    public function testCodeRebuild()
+    {
+        $this->terminus(
+            sprintf('env:code-rebuild %s', $this->getSiteEnv())
+        );
     }
 }

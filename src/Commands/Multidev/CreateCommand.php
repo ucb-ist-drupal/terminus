@@ -26,6 +26,7 @@ class CreateCommand extends TerminusCommand implements SiteAwareInterface
      * then it will be used when the new environment is created.
      *
      * @authorize
+     * @interact
      *
      * @command multidev:create
      * @aliases env:create
@@ -38,13 +39,9 @@ class CreateCommand extends TerminusCommand implements SiteAwareInterface
      * @option bool $no-db Do not clone database
      * @option bool $no-files Do not clone files
      *
-     * @usage <site>.<env> <multidev> Creates the Multidev environment,
-     *     <multidev>, within <site> with database and files from the <env>
-     *     environment.
-     * @usage <site>.<env> <multidev> --no-db Creates the <multidev>
-     *     environment without database from the <env> environment.
-     * @usage <site>.<env> <multidev> --no-files Creates the <multidev>
-     *     environment without files from the <env> environment.
+     * @usage <site>.<env> <multidev> Creates the Multidev environment, <multidev>, within <site> with database and files from the <env> environment.
+     * @usage <site>.<env> <multidev> --no-db Creates the <multidev> environment without database from the <env> environment.
+     * @usage <site>.<env> <multidev> --no-files Creates the <multidev> environment without files from the <env> environment.
      *
      * @throws \Pantheon\Terminus\Exceptions\TerminusException
      * @throws \Exception
@@ -59,6 +56,13 @@ class CreateCommand extends TerminusCommand implements SiteAwareInterface
     ) {
         $this->requireSiteIsNotFrozen($site_env);
         $site = $this->getSiteById($site_env);
+
+        if ($site->isEvcs()) {
+            throw new \Pantheon\Terminus\Exceptions\TerminusException(
+                'Multidev environments should be created from your external repository for this site.'
+            );
+        }
+
         $env = $this->getEnv($site_env);
 
         if (strlen($multidev) > 11) {

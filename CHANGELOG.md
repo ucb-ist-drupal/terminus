@@ -1,6 +1,130 @@
 # Change Log
 All notable changes to this project will be documented in this file. This project adheres to [Semantic Versioning](http://semver.org)
 
+## 4.1.1 - 2025-11-04
+
+### Added
+- Auto-detect URLs for db clone search-replace (#2738)
+
+### Fixed
+- Fix output of drush_version in `env:info` (#2736)
+
+## 4.1.0 - 2025-09-29
+
+### Added
+
+- Add "PHP Runtime Generation" (php_runtime_generation) and "PHP Version" (php_version) to the `env:list` command (#2729, #2732)
+
+### Fixed
+
+- Fix workflow:wait timeout to use warnings instead of errors (#2724)
+
+## 4.0.3 - 2025-09-11
+
+### Added
+
+- Make site label available in `site:list` and `org:site:list` commands (#2708)
+- Add a debug log message to `workflow:wait` printing the workflow start time (#2703)
+
+### Fixed
+- Fix regression for drush/wp-cli commands on eVCS sites (#2719)
+- Un-deprecated `--tags` parameter on `org:site:list` command (#2709)
+- Remove unnecessary api call from `tag:add` and `tag:list` causing unnecessary load and timeouts (#2718)
+
+
+## 4.0.2 - 2025-09-05
+
+### Added
+
+- Added PHP Runtime Generation version to `env:info` command output (#2714)
+- GitHub integration support for various commands (#2505, #2699, #2704, #2711)
+
+### Fixed
+
+- PantheonAliasPolicyCommands docblock is now complete (#2635)
+- Simplify and fix some bugs in workflow:wait command (#2702)
+
+## 4.0.1 - 2025-05-19
+
+### Fixed
+
+- env:code-rebuild command should no longer throw a fatal error (#2694)
+
+## 4.0.0 - 2025-05-07
+
+### Added
+
+- Readd update check and prompt to update when running an old Terminus version (#2669)
+- Prompt for missing required arguments when in interactive mode (#2684)
+
+### Fixed
+
+- Response json_decode should fallback to original body text (#2687)
+- Simplify env:wake command (#2689)
+
+## 4.0.0-alpha1 - 2025-03-06
+
+### Added
+
+- Support for PHP 8.4
+
+### Removed
+
+- Support for PHP versions prior to 8.2
+
+## 3.6.2 - 2025-03-03
+- Pass verbose flag to ssh if terminus is in verbose mode (#2663)
+- Bug fix: backup:restore with --file parameter restores backups multiple ties (#2664)
+
+## 3.6.1 - 2024-12-04
+
+### Added
+
+- New "branch" option to "local:clone" command (#2648)
+
+### Fixed
+
+- Bug while handling exception due to environment unable to wake (#2637)
+- Added correct documentation link to env:clone-content command (#2632)
+- Fixed undefined notice for $command_summary during WP-CLI/Drush execution (#2614)
+
+## 3.6.0 - 2024-09-18
+
+### Added
+
+- New command "site:label:set" to set a site's label (#2626)
+- Track command success rates and execution time (#2623)
+
+## 3.5.2 - 2024-08-19
+
+### Fixed
+
+- Fix undefined notice from sftp password cleanup (#2609)
+- Use right message after site or environment creation (#2611)
+
+### Added
+
+- Add new header x-pantheon-terminus-environment (#2613)
+
+### Changed
+
+- Add retries to env:wake (#2612)
+- Add more logging to env:wake command (#2586)
+
+
+## 3.5.1 - 2024-06-13
+- Fix a bug where the --filter option was not working correctly for several commands [#2607]
+
+## 3.5.0
+- Retry option added for Drush and WP-CLI commands (#2588)
+- Provides a trace ID when running remote commands (Drush, WP-CLI) (#2589)
+- Terminus Workflow:waitForCommit command added (#2591)
+- Add new static cache for site_names (#2594)
+- Env deploy command should only be used in test/live envs (#2575)
+- Fix multidev:create command help (#2579)
+- On April 30st, 2024, Pantheon deprecated support for password authentication for ssh, which is used for git and sftp.  Going forward, users need to use ssh keys for git and sftp. [https://docs.pantheon.io/ssh-keys](https://docs.pantheon.io/ssh-keys) (#2572)
+- Non-interactive commands should also exit with error if the workflow failed (#2583)
+
 ## 3.4.0
 
 - Update clone:content command documentation #2560

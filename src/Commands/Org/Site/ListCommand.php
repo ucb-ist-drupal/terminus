@@ -22,12 +22,14 @@ class ListCommand extends TerminusCommand implements SiteAwareInterface
      *
      * @authorize
      * @filter-output
+     * @interact
      *
      * @command org:site:list
      * @aliases org:sites
      *
      * @field-labels
      *     name: Name
+     *     label: Label
      *     id: ID
      *     plan_name: Plan
      *     framework: Framework
@@ -35,11 +37,13 @@ class ListCommand extends TerminusCommand implements SiteAwareInterface
      *     created: Created
      *     tags: Tags
      *     frozen: Is Frozen?
+     * @default-fields name,id,plan_name,framework,owner,created,tags,frozen
      * @return RowsOfFields
      *
      * @param string $organization Organization name, label, or ID
      * @option plan DEPRECATED Plan filter; filter by the plan's label
-     * @option string $tag DEPRECATED Tag name to filter
+     * @option string $tag Tag name to filter (ANY)
+     * @option string $tags Multiple tag names to filter (ALL)
      * @option string $upstream Upstream name to filter
      *
      * @usage <organization> Displays the list of sites associated with <organization>.

@@ -548,34 +548,6 @@ class Site extends TerminusModel implements
     }
 
     /**
-     * Update service level
-     *
-     * @deprecated 2.0.0 This is no longer the appropriate way to change a
-     *     site's plan. Use $this->getPlans()->set().
-     *
-     * @param string $service_level Level to set service on site to
-     *
-     * @return Workflow
-     * @throws TerminusException|\Exception
-     */
-    public function updateServiceLevel($service_level)
-    {
-        try {
-            return $this->getWorkflows()->create(
-                'change_site_service_level',
-                ['params' => compact('service_level'),]
-            );
-        } catch (\Exception $e) {
-            if ($e->getCode() == 403) {
-                throw new TerminusException(
-                    'A payment method is required to increase the service level of this site.'
-                );
-            }
-            throw $e;
-        }
-    }
-
-    /**
      * @return bool
      */
     public function valid(): bool
@@ -600,5 +572,45 @@ class Site extends TerminusModel implements
     public function __toString()
     {
         return $this->getName();
+    }
+
+    /**
+     * @return WorkflowLogsCollection
+     * @throws ContainerExceptionInterface
+     * @throws NotFoundExceptionInterface
+     */
+    public function getWorkflowLogs(): WorkflowLogsCollection
+    {
+        $nickname = \uniqid(__FUNCTION__ . "-");
+        $this->getContainer()->add($nickname, WorkflowLogsCollection::class)
+            ->addArgument($this);
+        return $this->getContainer()->get($nickname)->fetch();
+    }
+
+    /**
+     * @return bool
+     * @throws TerminusException
+     */
+    public function isEvcs(): bool
+    {
+        // We are using a variable that we retrieve at environment level,
+        // so we need to retrieve dev environment first.
+        $env = $this->getEnvironments()->get('dev');
+        if (empty($env)) {
+            throw new TerminusException(
+                'Site {site} does not have a dev environment.',
+                ['site' => $this->getName()]
+            );
+        }
+        return $env->isEvcsSite();
+    }
+
+    /**
+     * @return bool
+     * @throws TerminusException
+     */
+    public function isNodejs(): bool
+    {
+        return $this->get('framework') === 'nodejs';
     }
 }

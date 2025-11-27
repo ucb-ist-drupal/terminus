@@ -15,20 +15,6 @@ class SiteCommandsTest extends TerminusTestBase
     private $mockSiteName;
 
     /**
-     * @inheritdoc
-     */
-    protected function tearDown(): void
-    {
-        if (isset($this->mockSiteName)) {
-            $this->terminus(
-                sprintf('site:delete %s', $this->mockSiteName),
-                ['--quiet'],
-                false
-            );
-        }
-    }
-
-    /**
      * @test
      * @covers \Pantheon\Terminus\Commands\Site\ListCommand
      *
@@ -48,6 +34,47 @@ class SiteCommandsTest extends TerminusTestBase
 
     /**
      * @test
+     * @covers \Pantheon\Terminus\Commands\Site\ListCommand
+     *
+     * @group site
+     * @group short
+     */
+    public function testSiteListCommandWithLabelField()
+    {
+        $siteList = $this->terminusJsonResponse(sprintf('site:list --org=%s --fields=id,label', $this->getOrg()));
+        $this->assertIsArray($siteList);
+        $this->assertGreaterThan(0, count($siteList));
+
+        $site = array_shift($siteList);
+        $this->assertArrayHasKey('id', $site);
+        $this->assertArrayHasKey('label', $site);
+    }
+
+    /**
+     * @test
+     * @covers \Pantheon\Terminus\Commands\Site\ListCommand
+     *
+     * @group site
+     * @group short
+     */
+    public function testSiteListCommandWithLabelFilter()
+    {
+        $partial_site_name = substr($this->getSiteName(), 0, -1);
+        $siteList = $this->terminusJsonResponse(sprintf(
+            'site:list --org=%s --fields=id,label --filter=\'label*=%s\'',
+            $this->getOrg(),
+            $partial_site_name
+        ));
+        $this->assertIsArray($siteList);
+        $this->assertGreaterThan(0, count($siteList));
+
+        $site = array_shift($siteList);
+        $this->assertArrayHasKey('id', $site);
+        $this->assertArrayHasKey('label', $site);
+    }
+
+    /**
+     * @test
      * @covers \Pantheon\Terminus\Commands\Site\Org\ListCommand
      *
      * @group site
@@ -58,6 +85,19 @@ class SiteCommandsTest extends TerminusTestBase
         $orgList = $this->terminusJsonResponse(sprintf('site:org:list %s', $this->getSiteName()));
         $this->assertIsArray($orgList);
         $this->assertGreaterThan(0, count($orgList));
+    }
+
+    /**
+     * @test
+     * @covers \Consolidation\Filter\Hooks\FilterHooks
+     *
+     * @group site
+     * @group short
+     */
+    public function testSiteListFilterOption()
+    {
+        $siteListHelpOutput = $this->terminus('help site:list');
+        $this->assertStringContainsString('--filter[=FILTER]', $siteListHelpOutput);
     }
 
     /**
@@ -116,5 +156,48 @@ class SiteCommandsTest extends TerminusTestBase
             ),
             $output
         );
+    }
+
+    /**
+     * @test
+     * @covers \Pantheon\Terminus\Commands\Site\LabelCommand
+     *
+     * @group site
+     * @group short
+     */
+
+    public function testSiteLabelCommand()
+    {
+        $label = uniqid('test-label');
+        $command = sprintf('site:label:set %s "%s"', $this->getSiteName(), $label);
+        $this->terminus(
+            $command,
+            ['--yes']
+        );
+        $siteInfo = $this->terminusJsonResponse(sprintf('site:info %s', $this->getSiteName()));
+        $this->assertNotEmpty($siteInfo);
+        $this->assertIsArray($siteInfo);
+        $this->assertArrayHasKey('label', $siteInfo);
+        $this->assertEquals($label, $siteInfo['label']);
+        // Change it back
+        $command = sprintf('site:label:set %s "%s"', $this->getSiteName(), $this->getSiteName());
+        $this->terminus(
+            $command,
+            ['--yes']
+        );
+    }
+
+    /**
+     * @inheritdoc
+     */
+    protected function tearDown(): void
+    {
+        if (isset($this->mockSiteName)) {
+            $this->terminus(
+                sprintf('site:delete %s', $this->mockSiteName),
+                ['--quiet'],
+                false
+            );
+        }
     }
 }
