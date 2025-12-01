@@ -2,6 +2,19 @@
 
 This changelog documents WPS-specific changes to the Terminus fork maintained for WpsConsole integration.
 
+## wps-terminus-4.1.1-rev2 (2025-12-01)
+
+### Changed
+- **BREAKING**: Moved php-vcr/php-vcr from require-dev to require
+
+### Rationale
+This change ensures php-vcr is available in the compiled phar, which is necessary for:
+1. **phpVCR functionality**: The phar must include php-vcr classes for WpsConsole's phpVCR testing integration
+2. **Development workflow**: When mounting terminus source for debugging with xdebug (bin/wps -T), php-vcr must be available
+3. **Build simplification**: Avoids complex Box configuration to force inclusion of dev dependencies in the phar
+
+While php-vcr is technically a testing dependency, its small footprint and critical role in WPS development workflows justifies inclusion in production dependencies. This ensures consistent behavior whether terminus runs from the phar or mounted source.
+
 ## wps-terminus-4.1.1 (2025-11-28)
 
 ### Updated

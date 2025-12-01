@@ -28,6 +28,7 @@
     "justinrainbow/json-schema": "^5.2",
     "league/container": "^4.2",
     "monolog/monolog": "^2.2",
+    "php-vcr/php-vcr": "^1.8.0",
     "psy/psysh": "^0.12.6",
     "rogervila/array-diff-multidimensional": "^2.0",
     "twig/twig": "^3.3"
@@ -38,7 +39,6 @@
     "erusev/parsedown": "^1.7",
     "friendsofphp/php-cs-fixer": "^3.17",
     "pcov/clobber": "^2.0",
-    "php-vcr/php-vcr": "^1.8.0",
     "phpunit/php-code-coverage": "^9.2",
     "phpunit/phpcov": "^8.2",
     "phpunit/phpunit": "^9",
