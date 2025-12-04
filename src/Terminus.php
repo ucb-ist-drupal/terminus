@@ -537,11 +537,16 @@ EOD;
         if (getenv('WPS_VCR_PATH')) {
             VCR::configure()->setCassettePath(getenv('WPS_VCR_PATH'));
             VCR::configure()->enableLibraryHooks(['curl', 'stream_wrapper']);
+            // DEBUG: Log phpVCR status
+            error_log("VCR: Cassette path: " . getenv('WPS_VCR_PATH') . "\n", 3, "/tmp/phpvcr-debug.log");
+            error_log("VCR: Cassette name: " . $options['cassette'] . "\n", 3, "/tmp/phpvcr-debug.log");
+            error_log("VCR: Mode: " . $options['mode'] . "\n", 3, "/tmp/phpvcr-debug.log");
         }
         VCR::configure()->enableRequestMatchers(['method', 'url', 'body']);
         VCR::configure()->setMode($options['mode']);
         VCR::turnOn();
         VCR::insertCassette($options['cassette']);
+        error_log("VCR: Started and cassette inserted\n", 3, "/tmp/phpvcr-debug.log");
     }
 
     /**
