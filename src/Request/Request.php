@@ -142,8 +142,24 @@ class Request implements
     {
         if (!isset($this->client)) {
             $config = $this->getConfig();
-            $stack = HandlerStack::create(new StreamHandler());
+
+            // Use CurlHandler when phpVCR is active (WPS_VCR_PATH set) so phpVCR's curl library hook can intercept requests
+            // Otherwise use StreamHandler (default)
+            if (getenv('WPS_VCR_PATH')) {
+                $handler = new \GuzzleHttp\Handler\CurlHandler();
+                $handlerName = 'CurlHandler';
+            } else {
+                $handler = new StreamHandler();
+                $handlerName = 'StreamHandler';
+            }
+
+            $stack = HandlerStack::create($handler);
             $stack->push(Middleware::retry($this->createRetryDecider()));
+
+            // DEBUG: Log which HTTP handler is being used
+            if (getenv('WPS_TERMINUS_VCR_DEBUG')) {
+                error_log("TERMINUS: Using $handlerName for Guzzle HTTP client\n", 3, "/tmp/phpvcr-debug.log");
+            }
 
             $params = $config->get('client_options') + [
                     'base_uri' => ($base_uri === null) ? $this->getBaseURI(
@@ -511,6 +527,12 @@ class Request implements
         );
         //Required objects and arrays stir benign warnings.
         error_reporting(E_ALL ^ E_WARNING);
+
+        // DEBUG: Log HTTP request
+        if (getenv('WPS_TERMINUS_VCR_DEBUG')) {
+            error_log("TERMINUS REQUEST: " . $method . " " . $uri . "\n", 3, "/tmp/phpvcr-debug.log");
+        }
+
         $response = $this->getClient()->send(
             new \GuzzleHttp\Psr7\Request(
                 $method,
@@ -520,6 +542,12 @@ class Request implements
             ),
             $options
         );
+
+        // DEBUG: Log HTTP response
+        if (getenv('WPS_TERMINUS_VCR_DEBUG')) {
+            error_log("TERMINUS RESPONSE: " . $response->getStatusCode() . " for " . $uri . "\n", 3, "/tmp/phpvcr-debug.log");
+        }
+
         $body = $response->getBody()->getContents();
         $statusCode = $response->getStatusCode();
         $headers = $response->getHeaders();

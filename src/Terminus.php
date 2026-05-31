@@ -573,10 +573,35 @@ EOD;
      */
     private function startVCR(array $options = ['cassette' => 'tmp', 'mode' => 'none',])
     {
-        VCR::configure()->enableRequestMatchers(['method', 'url', 'body',]);
+        if (getenv('WPS_VCR_PATH')) {
+            VCR::configure()->setCassettePath(getenv('WPS_VCR_PATH'));
+            //VCR::configure()->enableLibraryHooks(['curl', 'stream_wrapper']);
+            VCR::configure()->enableLibraryHooks(['curl']);
+            // DEBUG: Log phpVCR status
+            if (getenv('WPS_TERMINUS_VCR_DEBUG')) {
+                error_log("VCR: Cassette path: " . getenv('WPS_VCR_PATH') . "\n", 3, "/tmp/phpvcr-debug.log");
+                error_log("VCR: Cassette name: " . $options['cassette'] . "\n", 3, "/tmp/phpvcr-debug.log");
+                error_log("VCR: Mode: " . $options['mode'] . "\n", 3, "/tmp/phpvcr-debug.log");
+            }
+        }
+        VCR::configure()->enableRequestMatchers(['method', 'url', 'body']);
         VCR::configure()->setMode($options['mode']);
         VCR::turnOn();
+
+        // DEBUG: Check if cassette file exists before inserting
+        if (getenv('WPS_TERMINUS_VCR_DEBUG')) {
+            $cassettePath = getenv('WPS_VCR_PATH') ?: VCR::configure()->getCassettePath();
+            $cassetteFile = $cassettePath . '/' . $options['cassette'];
+            $exists = file_exists($cassetteFile);
+            $size = $exists ? filesize($cassetteFile) : 0;
+            error_log("VCR: Cassette file before insert - exists: " . ($exists ? 'YES' : 'NO') . ", size: $size bytes\n", 3, "/tmp/phpvcr-debug.log");
+            error_log("VCR: Cassette full path: $cassetteFile\n", 3, "/tmp/phpvcr-debug.log");
+        }
+
         VCR::insertCassette($options['cassette']);
+        if (getenv('WPS_TERMINUS_VCR_DEBUG')) {
+            error_log("VCR: Started and cassette inserted\n", 3, "/tmp/phpvcr-debug.log");
+        }
     }
 
     /**
@@ -584,8 +609,14 @@ EOD;
      */
     private function stopVCR()
     {
+        if (getenv('WPS_TERMINUS_VCR_DEBUG')) {
+            error_log("VCR: Ejecting cassette and turning off VCR\n", 3, "/tmp/phpvcr-debug.log");
+        }
         VCR::eject();
         VCR::turnOff();
+        if (getenv('WPS_TERMINUS_VCR_DEBUG')) {
+            error_log("VCR: Cassette ejected and VCR turned off\n", 3, "/tmp/phpvcr-debug.log");
+        }
     }
 
     /**
