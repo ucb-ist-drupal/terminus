@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "e69fa5efbc00a69e0d9c8c50b5c39ff6",
+    "content-hash": "5c8f071e0bafa8279161c8a491b99cde",
     "packages": [
         {
             "name": "beberlei/assert",
@@ -1588,22 +1588,22 @@
         },
         {
             "name": "php-vcr/php-vcr",
-            "version": "1.8.0",
+            "version": "1.12.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/php-vcr/php-vcr.git",
-                "reference": "ca996937cfa4ccf61b34979d9fa2db5baf342fd9"
+                "reference": "c1f8fd3d767a6a10ea2d33e92855e97d652170b4"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/php-vcr/php-vcr/zipball/ca996937cfa4ccf61b34979d9fa2db5baf342fd9",
-                "reference": "ca996937cfa4ccf61b34979d9fa2db5baf342fd9",
+                "url": "https://api.github.com/repos/php-vcr/php-vcr/zipball/c1f8fd3d767a6a10ea2d33e92855e97d652170b4",
+                "reference": "c1f8fd3d767a6a10ea2d33e92855e97d652170b4",
                 "shasum": ""
             },
             "require": {
                 "beberlei/assert": "^3.2.5",
                 "ext-curl": "*",
-                "php": "^8,<8.2|>=8.2.9,<8.4",
+                "php": "^8,<8.2|>=8.2.9,<8.6",
                 "symfony/event-dispatcher": "^4|^5|^6|^7",
                 "symfony/event-dispatcher-contracts": "^1|^2|^3",
                 "symfony/yaml": "^3|^4|^5|^6|^7"
@@ -1612,13 +1612,14 @@
                 "editorconfig-checker/editorconfig-checker": "^10.3",
                 "ext-soap": "*",
                 "friendsofphp/php-cs-fixer": "^3.0",
-                "guzzlehttp/guzzle": "^7",
+                "guzzlehttp/guzzle": "^7|^8",
                 "mikey179/vfsstream": "^1.6.10",
                 "phpstan/extension-installer": "^1.1",
                 "phpstan/phpstan": "^1",
                 "phpstan/phpstan-beberlei-assert": "^1",
                 "phpstan/phpstan-phpunit": "^1",
-                "phpunit/phpunit": "^9.5.10",
+                "phpunit/phpunit": "^9.5.10|^10.5|^11.0",
+                "symfony/http-client": "^5.4|^6.0|^7.0",
                 "thecodingmachine/phpstan-strict-rules": "^1"
             },
             "type": "library",
@@ -1635,14 +1636,20 @@
                 {
                     "name": "Adrian Philipp",
                     "email": "mail@adrian-philipp.com"
+                },
+                {
+                    "name": "Daniel Hürtgen",
+                    "email": "daniel@higidi.com",
+                    "role": "Maintainer"
                 }
             ],
             "description": "Record your test suite's HTTP interactions and replay them during future test runs for fast, deterministic, accurate tests.",
+            "homepage": "https://php-vcr.github.io/php-vcr/",
             "support": {
                 "issues": "https://github.com/php-vcr/php-vcr/issues",
-                "source": "https://github.com/php-vcr/php-vcr/tree/1.8.0"
+                "source": "https://github.com/php-vcr/php-vcr/tree/1.12.0"
             },
-            "time": "2024-10-29T19:57:47+00:00"
+            "time": "2026-08-05T22:08:02+00:00"
         },
         {
             "name": "phpowermove/docblock",

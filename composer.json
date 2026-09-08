@@ -27,7 +27,7 @@
     "justinrainbow/json-schema": "^5.2",
     "league/container": "^4.2",
     "monolog/monolog": "^3.10",
-    "php-vcr/php-vcr": "1.8.0",
+    "php-vcr/php-vcr": "1.12.0",
     "psy/psysh": "^0.12.6",
     "rogervila/array-diff-multidimensional": "^2.0",
     "twig/twig": "^3.3"
