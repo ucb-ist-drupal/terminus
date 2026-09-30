@@ -32,6 +32,11 @@ trait WorkflowProcessingTrait
             // The API will not allow polling faster than once per second.
             $retry_interval = 1000;
         }
+        // WPS fork: When php-vcr is replaying a cassette no API is called, so
+        // don't wait between polls.
+        if ($this->getConfig()->get('vcr_mode') === 'none' && !empty($this->getConfig()->get('vcr_cassette'))) {
+            $retry_interval = 0;
+        }
         $current_time = time();
         if ($timeout > 0) {
             $end_time = $current_time + $timeout;

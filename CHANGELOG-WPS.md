@@ -2,6 +2,11 @@
 
 This changelog documents WPS-specific changes to the Terminus fork maintained for WpsConsole integration.
 
+## Unreleased (wps-terminus-wpscon-431-phpvcr)
+
+### Changed
+- `WorkflowProcessingTrait::processWorkflow()` no longer sleeps between workflow polls while php-vcr is replaying a cassette (`vcr_mode` is `none` and `vcr_cassette` is set). Replayed polls make no API calls, so the default 5000 ms delay (1000 ms minimum) only slowed WpsConsole's Behat playback runs.
+
 ## wps-terminus-4.1.1-rev2 (2025-12-01)
 
 ### Changed

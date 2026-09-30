@@ -167,6 +167,40 @@ class WorkflowProcessingTraitTest extends TestCase
         $this->assertLessThan(2.0, $elapsed);
     }
 
+    public function testProcessWorkflowSkipsPollingDelayUnderVcrPlayback(): void
+    {
+        $workflow = $this->createWorkflowMock(true, true);
+        $user = $this->createTraitUser(['config' => [
+            'workflow_polling_delay_ms' => 5000,
+            'vcr_mode' => 'none',
+            'vcr_cassette' => 'cassette.yml',
+        ]]);
+
+        $start = microtime(true);
+        $user->processWorkflow($workflow);
+        $elapsed = microtime(true) - $start;
+
+        // Without the playback exception this would sleep 5 seconds.
+        $this->assertLessThan(1.0, $elapsed);
+    }
+
+    public function testProcessWorkflowKeepsPollingDelayWhenRecording(): void
+    {
+        $workflow = $this->createWorkflowMock(true, true);
+        $user = $this->createTraitUser(['config' => [
+            'workflow_polling_delay_ms' => 1000,
+            'vcr_mode' => 'new_episodes',
+            'vcr_cassette' => 'cassette.yml',
+        ]]);
+
+        $start = microtime(true);
+        $user->processWorkflow($workflow);
+        $elapsed = microtime(true) - $start;
+
+        // Recording calls the real API, so the delay still applies.
+        $this->assertGreaterThanOrEqual(1.0, $elapsed);
+    }
+
     public function testWaitForWorkflowFindsMatchingWorkflow(): void
     {
         $matchingWorkflow = $this->createMock(Workflow::class);
