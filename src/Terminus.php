@@ -594,7 +594,11 @@ EOD;
             $cassetteFile = $cassettePath . '/' . $options['cassette'];
             $exists = file_exists($cassetteFile);
             $size = $exists ? filesize($cassetteFile) : 0;
-            error_log("VCR: Cassette file before insert - exists: " . ($exists ? 'YES' : 'NO') . ", size: $size bytes\n", 3, "/tmp/phpvcr-debug.log");
+            error_log(
+                "VCR: Cassette file before insert - exists: " . ($exists ? 'YES' : 'NO') . ", size: $size bytes\n",
+                3,
+                "/tmp/phpvcr-debug.log"
+            );
             error_log("VCR: Cassette full path: $cassetteFile\n", 3, "/tmp/phpvcr-debug.log");
         }
 

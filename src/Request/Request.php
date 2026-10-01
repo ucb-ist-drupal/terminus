@@ -546,7 +546,11 @@ class Request implements
 
         // DEBUG: Log HTTP response
         if (getenv('WPS_TERMINUS_VCR_DEBUG')) {
-            error_log("TERMINUS RESPONSE: " . $response->getStatusCode() . " for " . $uri . "\n", 3, "/tmp/phpvcr-debug.log");
+            error_log(
+                "TERMINUS RESPONSE: " . $response->getStatusCode() . " for " . $uri . "\n",
+                3,
+                "/tmp/phpvcr-debug.log"
+            );
         }
 
         $body = $response->getBody()->getContents();

@@ -2,6 +2,11 @@
 
 This changelog documents WPS-specific changes to the Terminus fork maintained for WpsConsole integration.
 
+## wps-terminus-4.3.3-rev2 (2026-10-01)
+
+### Fixed
+- Wrap two WPS phpVCR debug `error_log()` calls in `src/Request/Request.php` and `src/Terminus.php` that exceeded phpcs's 120-character line limit. `composer code:lint` failed on them, so the fork's GitHub Actions CI stopped before unit tests and the phar build (from `4a5e9c67` through rev1).
+
 ## wps-terminus-4.3.3-rev1 (2026-10-01)
 
 Based on upstream Terminus 4.3.3. Re-applies the WPS phpVCR integration (WPSCON-431) on top of it.
