@@ -143,9 +143,10 @@ class Request implements
         if (!isset($this->client)) {
             $config = $this->getConfig();
 
-            // Use CurlHandler when phpVCR is active (WPS_VCR_PATH set) so phpVCR's curl library hook can intercept requests
+            // Use CurlHandler when phpVCR is active (WPS_VCR_PATH set and a cassette and mode configured, matching
+            // Terminus::run()) so phpVCR's curl library hook can intercept requests.
             // Otherwise use StreamHandler (default)
-            if (getenv('WPS_VCR_PATH')) {
+            if (getenv('WPS_VCR_PATH') && !empty($config->get('vcr_cassette')) && !empty($config->get('vcr_mode'))) {
                 $handler = new \GuzzleHttp\Handler\CurlHandler();
                 $handlerName = 'CurlHandler';
             } else {
