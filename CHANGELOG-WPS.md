@@ -2,6 +2,15 @@
 
 This changelog documents WPS-specific changes to the Terminus fork maintained for WpsConsole integration.
 
+## wps-terminus-4.3.3-rev3 (2026-10-14)
+
+Based on upstream Terminus 4.3.3.
+
+### Changed
+- WPSCON-521: Skip the delay between workflow polls whenever php-vcr is replaying a cassette, not only in `none` mode, so WpsConsole's `bin/wps -O` (record only missing Behat fixtures) replays existing fixtures at playback speed:
+  - `Terminus::startVCR()` sets `vcr_replaying` before inserting the cassette: TRUE in `none` mode, or in `once` mode when the cassette already exists and isn't empty (php-vcr only replays such a cassette)
+  - `WorkflowProcessingTrait::processWorkflow()` skips the delay when `vcr_replaying` is set. Without this, replayed `upstream:updates:apply` runs under `-O` were slow enough to be stopped
+
 ## wps-terminus-4.3.3-rev2 (2026-10-01)
 
 ### Fixed

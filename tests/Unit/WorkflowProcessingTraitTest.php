@@ -172,8 +172,7 @@ class WorkflowProcessingTraitTest extends TestCase
         $workflow = $this->createWorkflowMock(true, true);
         $user = $this->createTraitUser(['config' => [
             'workflow_polling_delay_ms' => 5000,
-            'vcr_mode' => 'none',
-            'vcr_cassette' => 'cassette.yml',
+            'vcr_replaying' => true,
         ]]);
 
         $start = microtime(true);
@@ -189,8 +188,7 @@ class WorkflowProcessingTraitTest extends TestCase
         $workflow = $this->createWorkflowMock(true, true);
         $user = $this->createTraitUser(['config' => [
             'workflow_polling_delay_ms' => 1000,
-            'vcr_mode' => 'new_episodes',
-            'vcr_cassette' => 'cassette.yml',
+            'vcr_replaying' => false,
         ]]);
 
         $start = microtime(true);

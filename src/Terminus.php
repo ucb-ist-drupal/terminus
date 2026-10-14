@@ -588,12 +588,22 @@ EOD;
         VCR::configure()->setMode($options['mode']);
         VCR::turnOn();
 
+        $cassettePath = getenv('WPS_VCR_PATH') ?: VCR::configure()->getCassettePath();
+        $cassetteFile = $cassettePath . '/' . $options['cassette'];
+        $exists = file_exists($cassetteFile);
+        $size = $exists ? filesize($cassetteFile) : 0;
+
+        // WPS fork: Record whether this process only replays the cassette, so
+        // callers can skip delays meant for the live API. In once mode an
+        // existing, non-empty cassette is replayed and never recorded to.
+        // This must be checked before the cassette is inserted.
+        $this->getConfig()->set(
+            'vcr_replaying',
+            $options['mode'] === 'none' || ($options['mode'] === 'once' && $size > 0)
+        );
+
         // DEBUG: Check if cassette file exists before inserting
         if (getenv('WPS_TERMINUS_VCR_DEBUG')) {
-            $cassettePath = getenv('WPS_VCR_PATH') ?: VCR::configure()->getCassettePath();
-            $cassetteFile = $cassettePath . '/' . $options['cassette'];
-            $exists = file_exists($cassetteFile);
-            $size = $exists ? filesize($cassetteFile) : 0;
             error_log(
                 "VCR: Cassette file before insert - exists: " . ($exists ? 'YES' : 'NO') . ", size: $size bytes\n",
                 3,

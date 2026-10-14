@@ -33,8 +33,8 @@ trait WorkflowProcessingTrait
             $retry_interval = 1000;
         }
         // WPS fork: When php-vcr is replaying a cassette no API is called, so
-        // don't wait between polls.
-        if ($this->getConfig()->get('vcr_mode') === 'none' && !empty($this->getConfig()->get('vcr_cassette'))) {
+        // don't wait between polls. (Set in Terminus::startVCR().)
+        if ($this->getConfig()->get('vcr_replaying')) {
             $retry_interval = 0;
         }
         $current_time = time();
